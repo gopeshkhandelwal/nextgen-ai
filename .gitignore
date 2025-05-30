@@ -1,0 +1,54 @@
+# === Python Bytecode & Cache ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.faiss
+
+# === Environment Files ===
+.env
+.env.*
+
+# === Logs and Outputs ===
+*.log
+*.out
+*.err
+*.tmp
+*.bak
+
+# === Virtual Environment ===
+venv/
+.env/
+.venv/
+
+# === IDEs and Editors ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS Specific ===
+.DS_Store
+Thumbs.db
+
+# === Notebooks (optional) ===
+.ipynb_checkpoints/
+
+# === Docker / Build Artifacts ===
+*.tar
+*.img
+*.bin
+*.iso
+*.lock
+*.pid
+
+# === Misc ===
+dist/
+build/
+.eggs/
+*.egg-info/
+site/
+coverage/
+htmlcov/
+
