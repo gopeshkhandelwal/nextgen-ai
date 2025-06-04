@@ -6,7 +6,7 @@ PYTHONPATH=.
 run-server:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) mcp_server/server.py
 
-# === Run MCP Client + Server Together ===
+# === Run MCP Client ===
 run-client:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) mcp_client/client.py mcp_server/server.py
 

@@ -7,11 +7,11 @@ IDC_API_TOKEN = os.getenv("IDC_API_TOKEN")
 
 def register_tools(mcp):
     @mcp.tool()
-    async def list_idc_images() -> str:
-        logger.info("Tool called: list_idc_images")
+    async def list_idc_pools() -> str:
+        logger.info("Tool called: list_idc_pools")
         if not IDC_API_TOKEN:
             return "IDC API token not configured. Please set IDC_API_TOKEN in your environment."
-        url = "https://compute-us-region-5-api.cloud.intel.com/v1/machineimages"
+        url = "https://compute-us-region-5-api.cloud.intel.com/v1/fleetadmin/computenodepools"
         logger.info(f"URL: {url}")
         headers = {"Authorization": f"Bearer {IDC_API_TOKEN}"}
         try:
@@ -19,8 +19,8 @@ def register_tools(mcp):
                 response = await client.get(url, headers=headers, timeout=30.0)
                 response.raise_for_status()
                 data = response.json()
-                image_names = [item["metadata"]["name"] for item in data.get("items", [])]
-                return "\n".join(image_names or ["No images found."])
+                pool_names = [item["poolName"] for item in data.get("computeNodePools", [])]
+                return "\n".join(pool_names or ["No pool found."])
         except Exception as e:
-            logger.exception("Error fetching IDC images", e)
-            return "Failed to retrieve IDC image list."
+            logger.exception(f"Error fetching IDC pools: {e}")
+            return "Failed to retrieve IDC pools."
