@@ -85,9 +85,13 @@ class MCPClient:
                 logger.info("🔧 Tool call from LLM: %s(%s)", tool_name, tool_args)
 
                 tool_result = await self.session.call_tool(tool_name, tool_args)
-                logger.info(f"tool_result in client: {tool_result}")
-                
+                logger.info("🔙 Tool result: %s", tool_result.content)
 
+                # Append tool interaction to messages
+                messages = [
+                    {"role": "system", "content": "You are an assistant that helps with cloud infrastructure tasks using tool results."},
+                    {"role": "user", "content": query}
+                ]
                 messages.append({
                     "role": "assistant",
                     "tool_calls": [call.model_dump()]
@@ -95,18 +99,23 @@ class MCPClient:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call.id,
-                    "content": tool_result.content
+                    "content": str(tool_result.content[0].text)
                 })
+
+            logger.info("📨 Final prompt with tool result:\n%s", json.dumps(messages, indent=2))
 
             followup = client.chat.completions.create(
                 model=MODEL,
                 messages=messages
             )
-            final_output.append(followup.choices[0].message.content)
+            final_response = followup.choices[0].message.content
+            logger.info("✅ Final LLM Response:\n%s", final_response)
+            final_output.append(final_response)
         else:
             final_output.append(message.content)
 
         return "\n".join(final_output)
+
 
     async def chat_loop(self):
         logger.info("🧠 LLM + MCP Tool Client started")
