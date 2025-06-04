@@ -20,7 +20,9 @@ def register_tools(mcp):
                 response.raise_for_status()
                 data = response.json()
                 pool_names = [item["poolName"] for item in data.get("computeNodePools", [])]
-                return "\n".join(pool_names or ["No pool found."])
+                response = "\n".join(pool_names or ["No pool found."])
+                logger.info(f"list_idc_pools response: {response}")
+                return response
         except Exception as e:
             logger.exception(f"Error fetching IDC pools: {e}")
             return "Failed to retrieve IDC pools."

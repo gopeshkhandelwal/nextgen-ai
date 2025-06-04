@@ -85,6 +85,8 @@ class MCPClient:
                 logger.info("🔧 Tool call from LLM: %s(%s)", tool_name, tool_args)
 
                 tool_result = await self.session.call_tool(tool_name, tool_args)
+                logger.info(f"tool_result in client: {tool_result}")
+                
 
                 messages.append({
                     "role": "assistant",
