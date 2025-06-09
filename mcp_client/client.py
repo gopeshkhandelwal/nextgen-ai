@@ -27,7 +27,8 @@ client = OpenAI(
     base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 )
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4")
+MODEL = os.getenv("OPENAI_MODEL")
+logger.info("Using OpenAI model: %s", MODEL)
 
 class MCPClient:
     def __init__(self):
@@ -62,9 +63,9 @@ class MCPClient:
             for tool in tool_response.tools
         ]
 
-        logger.info("🔍 Prompt sent to LLM:\n%s", json.dumps(messages, indent=2))
-        logger.info("🔧 Tools registered:\n%s", json.dumps(available_tools, indent=2))
+        logger.info("🔧 Tools registered: %s", [tool['function']['name'] for tool in available_tools])
 
+        logger.info("📝 Sending query to LLM: %s", query)
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
@@ -73,7 +74,7 @@ class MCPClient:
         )
 
         message = response.choices[0].message
-        logger.info("🧠 LLM initial response:\n%s", message)
+        logger.debug("🧠 LLM initial response:\n%s", message)
 
         tool_calls = message.tool_calls or []
         final_output = []
@@ -102,7 +103,7 @@ class MCPClient:
                     "content": str(tool_result.content[0].text)
                 })
 
-            logger.info("📨 Final prompt with tool result:\n%s", json.dumps(messages, indent=2))
+            logger.debug("📨 Final prompt with tool result:\n%s", json.dumps(messages, indent=2))
 
             followup = client.chat.completions.create(
                 model=MODEL,

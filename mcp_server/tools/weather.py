@@ -1,48 +1,24 @@
 import logging
-from mcp_server.utils.http import make_nws_request
+import os
+import requests
+from dotenv import load_dotenv
 
-logger = logging.getLogger("weather_tools")
+logger = logging.getLogger(__name__)
+load_dotenv()
 
 def register_tools(mcp):
     @mcp.tool()
-    async def get_alerts(state: str) -> str:
-        logger.info(f"Tool called: get_alerts({state=})")
+    async def city_weather(city: str) -> str:
+        """Fetch current weather for a given city using the OpenWeather API."""
+        logger.info(f"Fetching weather for city: {city}")
         try:
-            url = f"https://api.weather.gov/alerts/active/area/{state}"
-            data = await make_nws_request(url)
-            if not data or "features" not in data:
-                return "No alert data found or unable to fetch."
-            if not data["features"]:
-                return "No active alerts for this state."
-            return "\n---\n".join(format_alert(f) for f in data["features"])
-        except Exception:
-            logger.exception("Error in get_alerts")
-            return "Error retrieving alerts."
-
-    @mcp.tool()
-    async def get_forecast(latitude: float, longitude: float) -> str:
-        logger.info(f"Tool called: get_forecast({latitude=}, {longitude=})")
-        try:
-            points_url = f"https://api.weather.gov/points/{latitude},{longitude}"
-            points_data = await make_nws_request(points_url)
-            forecast_url = points_data.get("properties", {}).get("forecast", "")
-            if not forecast_url:
-                return "Could not determine forecast URL."
-            forecast_data = await make_nws_request(forecast_url)
-            periods = forecast_data.get("properties", {}).get("periods", [])
-            return "\n---\n".join(
-                f"{p.get('name')}:\nTemp: {p.get('temperature')}°{p.get('temperatureUnit')}\n"
-                f"Wind: {p.get('windSpeed')} {p.get('windDirection')}\nForecast: {p.get('detailedForecast')}"
-                for p in periods[:5]
-            )
-        except Exception:
-            logger.exception("Error in get_forecast")
-            return "Error retrieving forecast."
-
-def format_alert(feature: dict) -> str:
-    props = feature.get("properties", {})
-    return f"""Event: {props.get('event', 'Unknown')}
-Area: {props.get('areaDesc', 'Unknown')}
-Severity: {props.get('severity', 'Unknown')}
-Description: {props.get('description', 'No description available')}
-Instructions: {props.get('instruction', 'No instructions provided')}"""
+            api_key = os.getenv("OPENWEATHER_API_KEY")
+            url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+            res = requests.get(url).json()
+            if "weather" not in res or "main" not in res:
+                return f"Could not retrieve weather for '{city}'."
+            desc = res['weather'][0]['description']
+            temp = res['main']['temp']
+            return f"The weather in {city.title()} is {desc} with a temperature of {temp:.1f}°C."
+        except Exception as e:
+            return f"Couldn't fetch weather: {e}"
