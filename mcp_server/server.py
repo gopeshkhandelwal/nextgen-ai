@@ -3,7 +3,7 @@ import traceback
 import logging
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from mcp_server.tools import weather, idc_images, idc_pools
+from mcp_server.tools import weather, idc_images, idc_pools, rag
 
 load_dotenv()
 
@@ -20,6 +20,7 @@ mcp = FastMCP("mcp_server")
 weather.register_tools(mcp)
 idc_pools.register_tools(mcp)
 idc_images.register_tools(mcp)
+rag.register_tools(mcp)
 
 if __name__ == "__main__":
     try:

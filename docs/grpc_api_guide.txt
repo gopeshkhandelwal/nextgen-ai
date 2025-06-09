@@ -1,0 +1,719 @@
+IDC gRPC API Guide
+##################
+
+IDC add-on services that run in the IDC control plane, such as OneAPI
+and Intel Kubernetes Services, should use the IDC gRPC APIs defined in
+`IDC Compute Public gRPC Protobuf specification`_ and
+`IDC Compute Private gRPC Protobuf specification`_ to
+create, read, update, and delete (CRUD) instances and related objects.
+
+API Documentation
+*****************
+
+-  Some IDC gRPC APIs are intended for the public and/or use by the IDC
+   Console. These have equivalent REST APIs provided through the
+   `gRPC-REST Gateway`_.
+   The Swagger (OpenAPI) specification is available at
+   https://compute-us-region-1-api.cloud.intel.com/openapiv2/ and
+   `IDC Compute Public OpenAPI specification`_.
+-  `IDC Compute Public gRPC Protobuf specification`_.
+-  `IDC Compute Private gRPC Protobuf specification`_.
+   These APIs are intended for use only by trusted IDC services.
+
+API Endpoints
+*************
+
+Production API Endpoints
+*************************
+
+.. list-table::
+   :header-rows: 1
+  
+   * - Name
+     - Value
+     
+   * - Global REST API
+     - api.idcservice.net
+     
+   * - Global GRPC API
+     - grpcapi.idcservice.net
+    
+   * - Regional REST API
+     - compute-us-region-1-api.cloud.intel.com
+     
+   * - Regional GRPC API (REGIONAL_GRPC_API)
+     - compute-us-region-1-grpcapi.idcmgt.intel.com
+
+Authentication
+**************
+
+Authentication for IDC Services
+===============================
+
+IDC services should authenticate with other IDC services using mTLS. TLS
+certificates and keys should be mounted in the IDC service container
+using Vault annotations. An example is shown below.
+
+.. code-block: yaml
+
+       vault.hashicorp.com/agent-init-first: "true"
+       vault.hashicorp.com/agent-inject: "true"
+       vault.hashicorp.com/agent-inject-secret-ca.pem: dev4-root-ca/cert/ca_chain
+       vault.hashicorp.com/agent-inject-secret-certkey.pem: ""
+       vault.hashicorp.com/agent-inject-template-ca.pem: |
+         {{- with secret "dev4-root-ca/cert/ca_chain"  -}}
+         {{ .Data.certificate }}
+         {{- end }}
+       vault.hashicorp.com/agent-inject-template-certkey.pem: |
+         {{- with pkiCert "us-dev-1a-ca/issue/us-dev-1a-instance-replicator" "common_name=us-dev-1a-instance-replicator.idcs-system.svc.cluster.local" "ttl=60m"  -}}
+         {{ .Data.Cert }}
+         {{ .Data.CA }}
+         {{ .Data.Key }}
+         {{ .Data.Cert | writeToFile "/vault/secrets/cert.pem" "vault" "vault" "0644" }}
+         {{ .Data.CA | writeToFile "/vault/secrets/cert.pem" "vault" "vault" "0644" "append" }}
+         {{ .Data.Key | writeToFile "/vault/secrets/cert.key" "vault" "vault" "0644" }}
+         {{- end }}
+       vault.hashicorp.com/auth-path: auth/cluster-auth
+       vault.hashicorp.com/role: us-dev-1a-instance-replicator-role
+       vault.hashicorp.com/service: http://dev4-vault.idcs-dev.intel.com:80
+
+Helm charts for IDC services should include these annotations by adding
+``{{- include "idc-common.vaultPkiAnnotations" . | nindent 8 }}`` to the
+deployment. For example, see
+`deployment/charts/instance-replicator/templates/deployment.yaml <https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/deployment/charts/instance-replicator/templates/deployment.yaml>`__.
+
+Generate a TLS Client Certificate for IDC Developers
+====================================================
+
+Intel employees with the appropriate permissions to Vault can follow
+these steps to generate a TLS client certificate.
+
+#. Browse to the `Vault UI <https://idcvaultproduction.eglb.intel.com/ui/vault/auth?with=oidc>`__.
+
+#. Open the top-right menu and click “Copy token”.
+
+#. Create the file ``local/secrets/${IDC_ENV}/VAULT_TOKEN`` and paste the token.
+
+#. Run:
+
+.. code-block:: bash
+
+   export IDC_ENV=prod
+   export COMMON_NAME=${USER}
+   export CREATE_ROLE=1
+   make generate-vault-pki-cert
+
+#. This will create the following files:
+
+   - ca.pem: 
+         The public certificate for the IDC Root Certificate Authority.
+         This will be used by your application to verify the gRPC server (TLS server).
+   - cert.pem:
+         The public certificate chain for ``${COMMON_NAME}``.
+         This will be provided by your application (TLS client) to the gRPC server so that the gRPC server can verify the your application.
+   - cert.key:
+         The private key for ``${COMMON_NAME}``.
+         This will be used by your application to authenticate to the gRPC server.
+
+gRPC Client
+***********
+
+gRPC clients should be instantiated using the ``grpcutil.NewClient`` function as shown below.
+
+.. code-block:: golang
+
+   import "github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/go/pkg/grpcutil"
+   import "github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/go/pkg/pb"
+
+   clientConn, err := grpcutil.NewClient(ctx, cfg.ComputeApiServerAddr, dialOptions...)
+   if err != nil {
+     return err
+   }
+   instanceClient := pb.NewInstanceServiceClient(clientConn)
+
+See
+`go/pkg/instance_replicator/cmd/instance_replicator/main.go <https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/go/pkg/instance_replicator/cmd/instance_replicator/main.go>`__
+for a complete example.
+
+Creating an Instance
+********************
+
+This section explains how to create (launch) a bare metal or virtual machine (VM) instance.
+
+Create a Cloud Account
+======================
+
+Cloud Accounts must be created using the `IDC Console`_.
+
+Create a VNet
+=============
+
+The default VNet for a Cloud Account is created by the `IDC Console`_.
+In the future, additional VNets can be created using the VNet API.
+For example, see `vnet_create_with_name.sh`_.
+
+Note that this example and the others below use the REST API through the `gRPC-REST Gateway`_.
+IDC services should directly use the corresponding gRPC client.
+
+Create (Upload) an SSH Public Key
+=================================
+
+For example, see `sshpublickey_create_with_name.sh`_.
+
+Create an Instance
+==================
+
+See `Create an Instance with grpcurl`_.
+
+See also `instance_create_with_name.sh`_.
+
+Testing the IDC Compute GPRC API with *grpcurl*
+-----------------------------------------------
+
+`grpcurl`_ is a command-line tool that lets you interact with gRPC servers.
+
+It can be installed with :command:`make install-interactive-tools`.
+
+List IDC Compute GRPC API Services with *grpcurl*
+=================================================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   list
+
+Expected output:
+
+.. code-block:: console
+
+   proto.InstancePrivateService
+   proto.InstanceSchedulingService
+   proto.InstanceService
+   proto.InstanceTypeService
+   proto.IpResourceManagerService
+   proto.MachineImageService
+   proto.SshPublicKeyService
+   proto.VNetPrivateService
+   proto.VNetService
+
+Describe InstanceService RPCs with *grpcurl*
+============================================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   describe proto.InstanceService
+
+Expected output:
+
+.. code-block:: console
+
+   proto.InstanceService is a service:
+   service InstanceService {
+     rpc Create ( .proto.InstanceCreateRequest ) returns ( .proto.Instance ) {
+       option (.google.api.http) = {
+         post: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances"
+         body: "*"
+       };
+       option (.idc.method) = { authz:<cloudAccount:true product:true> };
+     }
+     rpc Delete ( .proto.InstanceDeleteRequest ) returns ( .google.protobuf.Empty ) {
+       option (.google.api.http) = {
+         delete: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances/id/{metadata.resourceId}"
+         additional_bindings: <
+           delete: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances/name/{metadata.name}"
+         >
+       };
+       option (.idc.method) = { authz:<cloudAccount:true> };
+     }
+     rpc Get ( .proto.InstanceGetRequest ) returns ( .proto.Instance ) {
+       option (.google.api.http) = {
+         get: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances/id/{metadata.resourceId}"
+         additional_bindings: <
+           get: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances/name/{metadata.name}"
+         >
+       };
+       option (.idc.method) = { authz:<cloudAccount:true> };
+     }
+     rpc Ping ( .google.protobuf.Empty ) returns ( .google.protobuf.Empty );
+     rpc Search ( .proto.InstanceSearchRequest ) returns ( .proto.InstanceSearchResponse ) {
+       option (.google.api.http) = {
+         get: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances"
+       };
+       option (.idc.method) = { authz:<cloudAccount:true> };
+     }
+     rpc Update ( .proto.InstanceUpdateRequest ) returns ( .google.protobuf.Empty ) {
+       option (.google.api.http) = {
+         put: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances/id/{metadata.resourceId}"
+         body: "*"
+         additional_bindings: <
+           put: "/v1/cloudaccounts/{metadata.cloudAccountId}/instances/name/{metadata.name}"
+           body: "*"
+         >
+       };
+       option (.idc.method) = { authz:<cloudAccount:true> };
+     }
+   }
+
+Describe Messages with *grpcurl*
+================================
+
+The following example shows how to get the schema of a message (data
+type). You will need to run this several times to get the schema of
+messages contained within other messages.
+
+.. code-block:: bash
+
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   describe proto.InstanceCreateRequest
+
+Expected output:
+
+.. code-block:: console
+
+   proto.InstanceCreateRequest is a message:
+   message InstanceCreateRequest {
+     .proto.InstanceMetadataCreate metadata = 1;
+     .proto.InstanceSpec spec = 2;
+   }
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   describe proto.InstanceSpec
+
+Expected output:
+
+.. code-block:: console
+
+   proto.InstanceSpec is a message:
+   message InstanceSpec {
+     string availabilityZone = 1;
+     string instanceType = 2 [(.idc.field) = { product:true }];
+     string machineImage = 3;
+     .proto.RunStrategy runStrategy = 4;
+     repeated string sshPublicKeyNames = 5;
+     repeated .proto.NetworkInterface interfaces = 6;
+     reserved 7, 8, 9, 10, 11, 12, 13, 14;
+     reserved "clusterGroupId", "clusterId", "instanceTypeSpec", "machineImageSpec", "nodeId", "region", "serviceType", "sshPublicKeySpecs";
+   }
+
+Ping the Instance Service with *grpcurl*
+========================================
+
+This will send an empty “Ping” message to the service. If the request is
+authorized, the service will always respond with an empty message.
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   -d '{}' \
+   ${REGIONAL_GRPC_API}:443 \
+   proto.InstanceService/Ping
+
+Expected output:
+
+.. code-block:: console
+
+   {
+
+   }
+
+.. _Create an Instance with grpcurl:
+
+Create an Instance with *grpcurl*
+=================================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   -d '{
+         "metadata": {
+           "cloudAccountId": "442434389234",
+           "name": "tiny2"
+         },
+         "spec": {
+           "availabilityZone": "us-region-1a",
+           "instanceType": "vm-spr-tny",
+           "machineImage": "ubuntu-2204-jammy-v20230122",
+           "sshPublicKeyNames": [
+             "user@example.com"
+           ],
+           "interfaces": [
+             {
+               "name": "eth0",
+               "vNet": "us-region-1a-default"
+             }
+           ]
+         }
+       }' \
+   ${REGIONAL_GRPC_API}:443 \
+   proto.InstanceService/Create
+
+Expected output:
+
+.. code-block:: bash
+
+   {
+     "metadata": {
+       "cloudAccountId": "442434389234",
+       "name": "tiny2",
+       "resourceId": "b4856a34-5f56-41e1-ac4c-7f351c68ab08",
+       "resourceVersion": "676580",
+       "creationTimestamp": "2023-06-21T05:49:57.695696400Z"
+     },
+     "spec": {
+       "availabilityZone": "us-region-1a",
+       "instanceType": "vm-spr-tny",
+       "machineImage": "ubuntu-2204-jammy-v20230122",
+       "sshPublicKeyNames": [
+         "user@example.com"
+       ],
+       "interfaces": [
+         {
+           "name": "eth0",
+           "vNet": "us-region-1a-default"
+         }
+       ]
+     },
+     "status": {
+       "message": "Instance reconciliation has not started",
+       "sshProxy": {
+         
+       }
+     }
+   }
+
+List Instances with *grpcurl*
+=============================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   -d '{"metadata": {"cloudAccountId": "442434389234"}}' \
+   ${REGIONAL_GRPC_API}:443 \
+   proto.InstanceService/Search
+
+Expected output:
+
+.. code-block:: console
+
+   {
+     "items": [
+       {
+         "metadata": {
+           "cloudAccountId": "442434389234",
+           "name": "tiny1",
+           "resourceId": "03959d14-8172-4ef0-b5dd-0c1e6b4f8c20",
+           "resourceVersion": "673942",
+           "creationTimestamp": "2023-06-21T05:43:35.000236097Z"
+         },
+         "spec": {
+           "availabilityZone": "us-region-1a",
+           "instanceType": "vm-spr-tny",
+           "machineImage": "ubuntu-2204-jammy-v20230122",
+           "sshPublicKeyNames": [
+             "user@example.com"
+           ],
+           "interfaces": [
+             {
+               "name": "eth0",
+               "vNet": "us-region-1a-default"
+             }
+           ]
+         },
+         "status": {
+           "phase": "Ready",
+           "message": "Instance is running and has completed running startup scripts. ",
+           "interfaces": [
+             {
+               "name": "eth0",
+               "vNet": "us-region-1a-default",
+               "dnsName": "tiny1.442434389234.us-region-1.idcservice.net",
+               "prefixLength": 24,
+               "addresses": [
+                 "100.80.47.47"
+               ],
+               "subnet": "100.80.47.0",
+               "gateway": "100.80.47.1"
+             }
+           ],
+           "sshProxy": {
+             "proxyUser": "guest",
+             "proxyAddress": "146.152.232.8",
+             "proxyPort": 22
+           },
+           "userName": "ubuntu"
+         }
+       }
+     ]
+   }
+
+Delete an Instance with *grpcurl*
+=================================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   -d '{"metadata": {"cloudAccountId": "442434389234", "name": "tiny2"}}' \
+   ${REGIONAL_GRPC_API}:443 \
+   proto.InstanceService/Delete
+
+Expected output:
+
+.. code-block:: console
+
+   {
+
+   }
+
+List Machine Images with *grpcurl*
+==================================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   proto.MachineImageService/Search
+
+Expected output:
+
+.. literalinclude:: MachineImageService_Search_output.json
+
+IP Resource Manager
+*******************
+
+IP Resource Manager manages the allocation of IP subnets and addresses to tenant instances.
+It is a private API.
+
+Describe IpResourceManagerService RPCs with *grpcurl*
+=====================================================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   describe proto.IpResourceManagerService
+
+Expected output:
+
+.. code-block:: console
+
+   proto.IpResourceManagerService is a service:
+   service IpResourceManagerService {
+     rpc DeleteSubnet ( .proto.DeleteSubnetRequest ) returns ( .google.protobuf.Empty );
+     rpc Ping ( .google.protobuf.Empty ) returns ( .google.protobuf.Empty );
+     rpc PutSubnet ( .proto.CreateSubnetRequest ) returns ( .proto.CreateSubnetResponse );
+     rpc ReleaseAddress ( .proto.ReleaseAddressRequest ) returns ( .google.protobuf.Empty );
+     rpc ReleaseSubnet ( .proto.ReleaseSubnetRequest ) returns ( .google.protobuf.Empty );
+     rpc ReserveAddress ( .proto.ReserveAddressRequest ) returns ( .proto.ReserveAddressResponse );
+     rpc ReserveSubnet ( .proto.ReserveSubnetRequest ) returns ( .proto.Subnet );
+     rpc SearchSubnetStream ( .proto.SearchSubnetRequest ) returns ( stream .proto.Subnet );
+   }
+
+List Subnets with *grpcurl*
+===========================
+
+.. code-block:: bash
+
+   grpcurl \
+   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   ${REGIONAL_GRPC_API}:443 \
+   proto.IpResourceManagerService/SearchSubnetStream
+
+Expected output:
+
+.. code-block:: console
+
+   {
+     "region": "us-region-1",
+     "availabilityZone": "us-region-1a",
+     "subnet": "100.80.37.0/24",
+     "prefixLength": 24,
+     "gateway": "100.80.37.1",
+     "vlanId": 115
+   }
+   {
+     "region": "us-region-1",
+     "availabilityZone": "us-region-1a",
+     "subnet": "100.80.40.0/24",
+     "prefixLength": 24,
+     "gateway": "100.80.40.1",
+     "vlanId": 118
+   }
+
+
+Create a Vnet with *grpcurl*
+============================
+
+.. code-block:: bash
+
+  grpcurl \
+  --cacert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
+  --cert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
+  --key ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
+  -d '{
+        "metadata": {
+            "cloudAccountId": "373413096085",
+            "name": "us-dev-1b-metal"
+        },
+        "spec": {
+              "region": "us-dev-1",
+              "availabilityZone": "us-dev-1b",
+              "prefixLength": 27,
+              "trunkGroups": ["Tenant_Nets"]
+        }
+      }' \
+  ${REGIONAL_GRPC_API}:443 \
+  proto.VNetPrivateService/CreatePrivate
+
+Expected output:
+
+.. code-block:: console
+
+    {
+      "metadata": {
+        "cloudAccountId": "373413096085",
+        "name": "us-dev-1b-metal",
+        "resourceId": "945dd2f8-7ec0-41f7-aa63-fda593f0d21a"
+      },
+      "spec": {
+        "region": "us-dev-1",
+        "availabilityZone": "us-dev-1b",
+        "prefixLength": 27,
+        "trunkGroups": [
+          "Tenant_Nets"
+        ]
+      }
+    }
+
+Get VNet with *grpcurl*
+=======================
+
+.. code-block:: bash
+
+  grpcurl \
+  --cacert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
+  --cert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
+  --key ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
+   -d '{"metadata": {"cloudAccountId": "373413096085","name": "us-dev-1b-metal"}}' \
+  ${REGIONAL_GRPC_API}:443 \
+  proto.VNetPrivateService/GetPrivate
+
+Expected output:
+
+.. code-block:: console
+
+    {
+      "metadata": {
+        "cloudAccountId": "373413096085",
+        "name": "us-dev-1b-metal",
+        "resourceId": "945dd2f8-7ec0-41f7-aa63-fda593f0d21a"
+      },
+      "spec": {
+        "region": "us-dev-1",
+        "availabilityZone": "us-dev-1b",
+        "prefixLength": 27,
+        "trunkGroups": [
+          "Tenant_Nets"
+        ]
+      }
+    }
+
+Set trunk groups on existing VNet *grpcurl*
+===========================================
+
+.. code-block:: bash
+
+  grpcurl \
+  --cacert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
+  --cert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
+  --key ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
+  -d '{
+        "vNetReference": {
+            "cloudAccountId": "373413096085",
+            "name": "us-dev-1b-metal"
+        },
+        "trunkGroups": ["New_trunk_group"]
+    }' \
+  ${REGIONAL_GRPC_API}:443 \
+  proto.VNetPrivateService/SetTrunkGroups
+
+Expected output:
+
+.. code-block:: console
+
+    {
+      "metadata": {
+        "cloudAccountId": "373413096085",
+        "name": "us-dev-1b-metal",
+        "resourceId": "945dd2f8-7ec0-41f7-aa63-fda593f0d21a"
+      },
+      "spec": {
+        "region": "us-dev-1",
+        "availabilityZone": "us-dev-1b",
+        "prefixLength": 27,
+        "trunkGroups": [
+          "New_trunk_group"
+        ]
+      }
+    }
+   ...
+
+References
+**********
+
+-  `Shared Compute Services Design Document`_
+-  :ref:`security_testing`
+-  `Troubleshooting`_
+
+
+
+.. _IDC Compute Public gRPC Protobuf specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute.proto
+.. _IDC Compute Private gRPC Protobuf specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute_private.proto
+.. _IDC Compute Public OpenAPI specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute.swagger.json
+.. _gRPC-REST Gateway: https://github.com/grpc-ecosystem/grpc-gateway
+.. _IDC Console: https://console.idcservice.net/
+.. _Shared Compute Services Design Document: https://intel.sharepoint.com/:w:/r/sites/inteldevelopercloud/Shared%20Documents/Phase%201/Compute-aaS/Shared%20Compute%20Services%20Design%20Document.docx?d=wb48aef2e5d894317acd720f9386f712c&csf=1&web=1&e=8Cdx2O
+.. _vnet_create_with_name.sh: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/go/svc/compute_api_server/test-scripts/vnet_create_with_name.sh
+.. _sshpublickey_create_with_name.sh: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/go/svc/compute_api_server/test-scripts/sshpublickey_create_with_name.sh
+.. _instance_create_with_name.sh: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/go/svc/compute_api_server/test-scripts/instance_create_with_name.sh
+.. _grpcurl: https://pkg.go.dev/github.com/fullstorydev/grpcurl#section-readme
+.. _Troubleshooting: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/docs/source/_archive/troubleshooting.md
