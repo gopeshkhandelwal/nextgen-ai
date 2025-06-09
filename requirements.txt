@@ -7,3 +7,6 @@ langchain
 langchain-community
 langchain-huggingface
 faiss-cpu
+transformers
+torch
+sentencepiece
