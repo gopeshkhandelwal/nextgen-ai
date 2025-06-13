@@ -9,3 +9,4 @@ langchain-huggingface
 faiss-cpu
 transformers
 torch
+sentence-transformers
