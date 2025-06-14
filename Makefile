@@ -35,3 +35,6 @@ format:
 clean:
 	rm -rf .venv vectorstore
 
+test-rag:
+	. .venv/bin/activate && python utils/rag_test.py
+

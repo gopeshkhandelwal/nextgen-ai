@@ -4,8 +4,10 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from config import get_llm
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 INDEX_DIR = os.getenv("RAG_INDEX_DIR")
 EMBED_MODEL = os.getenv("RAG_EMBED_MODEL")
@@ -37,9 +39,18 @@ def register_tools(mcp):
     @mcp.tool()
     async def document_qa(question: str) -> str:
         """
-        Answer questions from internal documents using a RAG pipeline.
-        Returns a synthesized answer using an LLM and retrieved documents.
+        Answer questions about IDC Compute gRPC APIs, endpoints, authentication methods, Vault integration,
+        and instance-related operations using retrieval-augmented generation (RAG).
+
+        Returns a synthesized response using an LLM and the retrieved IDC gRPC API documentation.
+
+        Supported topics include:
+        - Public/private IDC gRPC APIs and their Swagger or protobuf definitions
+        - Authentication using mTLS and Vault annotations
+        - Using grpcurl for testing or exploration
+        - Service operations like InstanceService, VNetService, MachineImageService, etc.
         """
+
         logger.info(f"Tool called: document_qa with question: {question}")
         if retriever is None or rag_chain is None:
             logger.error("RAG vectorstore or chain is not available.")
