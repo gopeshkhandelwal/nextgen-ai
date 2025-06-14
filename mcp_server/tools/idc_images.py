@@ -12,6 +12,19 @@ IDC_API_IMAGES = os.getenv("IDC_API_IMAGES")
 def register_tools(mcp):
     @mcp.tool()
     async def list_idc_images() -> str:
+        """
+        Fetch and return a list of available IDC machine image names.
+
+        This tool queries the IDC Compute API using an authenticated request and returns the
+        metadata.name of each image found in the response.
+
+        Requirements:
+        - The environment variable IDC_API_TOKEN must be set.
+        - The endpoint URL must be provided via IDC_API_IMAGES.
+
+        Returns:
+        - A newline-separated string of image names, or an error message if the request fails.
+        """
         logger.info("Tool called: list_idc_images")
         if not IDC_API_TOKEN:
             return "IDC API token not configured. Please set IDC_API_TOKEN in your environment."

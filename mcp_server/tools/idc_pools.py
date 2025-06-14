@@ -12,6 +12,19 @@ IDC_API_POOLS = os.getenv("IDC_API_POOLS")
 def register_tools(mcp):
     @mcp.tool()
     async def list_idc_pools() -> str:
+        """
+        Fetch and return a list of available IDC compute node pool names.
+
+        This tool queries the IDC Compute API to retrieve computeNodePools and extracts their
+        poolName field for listing.
+
+        Requirements:
+        - The environment variable IDC_API_TOKEN must be set.
+        - The endpoint URL must be provided via IDC_API_POOLS.
+
+        Returns:
+        - A newline-separated string of compute pool names, or an error message if none are found.
+        """
         logger.info("Tool called: list_idc_pools")
         if not IDC_API_TOKEN:
             return "IDC API token not configured. Please set IDC_API_TOKEN in your environment."
