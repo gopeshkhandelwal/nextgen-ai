@@ -3,7 +3,7 @@ import traceback
 import logging
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from mcp_server.tools import weather, idc_images, idc_pools, rag
+from tools import weather, idc_images, idc_pools, rag
 
 load_dotenv()
 

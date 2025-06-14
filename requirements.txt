@@ -3,10 +3,11 @@ fastmcp>=0.2.0
 httpx>=0.24.0
 python-dotenv>=1.0.0
 mcp>=0.1.0
-langchain
-langchain-community
-langchain-huggingface
+langchain>=0.1.16
+langchain-community>=0.0.28
+langchain-huggingface>=0.0.6
+langchain-openai>=0.0.8
 faiss-cpu
-transformers
+transformers>=4.40.0
 torch
 sentence-transformers
