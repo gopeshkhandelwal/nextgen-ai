@@ -1,39 +1,50 @@
 import os
+import sys
 import logging
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from config import get_llm
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
-load_dotenv()
 
-INDEX_DIR = os.getenv("RAG_INDEX_DIR")
-EMBED_MODEL = os.getenv("RAG_EMBED_MODEL")
+def check_env_var(var_name):
+    value = os.getenv(var_name)
+    if not value:
+        logger.critical(f"Environment variable '{var_name}' is not set.")
+        sys.exit(1)
+    return value
 
-retriever = None
-rag_chain = None
+def initialize_rag():
+    """
+    Initialize the RAG retriever and chain with robust error handling.
+    Returns:
+        retriever, rag_chain
+    Exits the process if a critical error occurs.
+    """
+    try:
+        INDEX_DIR = check_env_var("RAG_INDEX_DIR")
+        EMBED_MODEL = check_env_var("RAG_EMBED_MODEL")
+        logger.info(f"RAG Vectorstore index: {INDEX_DIR}, Embedding model: {EMBED_MODEL}")
+        embedding_model = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+        if not os.path.exists(INDEX_DIR):
+            logger.critical(f"FAISS index not found at {INDEX_DIR}. Please build the vectorstore.")
+            sys.exit(1)
+        vectorstore = FAISS.load_local(INDEX_DIR, embedding_model, allow_dangerous_deserialization=True)
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
+        rag_chain = RetrievalQA.from_chain_type(
+            llm=get_llm(),
+            retriever=retriever,
+            chain_type="stuff"
+        )
+        logger.info("FAISS vectorstore and RAG chain loaded successfully.")
+        return retriever, rag_chain
+    except Exception as e:
+        logger.critical(f"Failed to initialize RAG pipeline: {e}", exc_info=True)
+        sys.exit(1)
 
-if not INDEX_DIR or not EMBED_MODEL:
-    logger.error("RAG_INDEX_DIR and RAG_EMBED_MODEL environment variables must be set.")
-else:
-    logger.info(f"RAG Vectorstore index: {INDEX_DIR}, Embedding model: {EMBED_MODEL}")
-    embedding_model = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-    if os.path.exists(INDEX_DIR):
-        try:
-            vectorstore = FAISS.load_local(INDEX_DIR, embedding_model, allow_dangerous_deserialization=True)
-            retriever = vectorstore.as_retriever(search_kwargs={"k": 8})  # Retrieve more docs for LLM synthesis
-            rag_chain = RetrievalQA.from_chain_type(
-                llm=get_llm(),
-                retriever=retriever,
-                chain_type="stuff"
-            )
-            logger.info("FAISS vectorstore and RAG chain loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load FAISS vectorstore: {e}")
-    else:
-        logger.warning(f"FAISS index not found at {INDEX_DIR}. Please build the vectorstore.")
+# Initialize RAG components at startup
+retriever, rag_chain = initialize_rag()
 
 def register_tools(mcp):
     @mcp.tool()
@@ -50,13 +61,11 @@ def register_tools(mcp):
         - Using grpcurl for testing or exploration
         - Service operations like InstanceService, VNetService, MachineImageService, etc.
         """
-
         logger.info(f"Tool called: document_qa with question: {question}")
         if retriever is None or rag_chain is None:
             logger.error("RAG vectorstore or chain is not available.")
             return "RAG vectorstore or chain is not available."
         try:
-            # Industry best practice: Use the RAG chain to synthesize the answer from all retrieved docs
             result = rag_chain.invoke({"query": question})
             answer = result.get("result", "") if isinstance(result, dict) else result
             if not answer.strip():
@@ -65,5 +74,5 @@ def register_tools(mcp):
             logger.info("Returning synthesized answer from RAG chain.")
             return answer.strip()
         except Exception as e:
-            logger.error(f"Error retrieving or synthesizing answer: {e}")
+            logger.error(f"Error retrieving or synthesizing answer: {e}", exc_info=True)
             return "Error retrieving or synthesizing answer from vectorstore."
