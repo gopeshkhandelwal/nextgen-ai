@@ -40,7 +40,7 @@ This project provides a production-ready system for integrating Large Language M
     ```
     - This will download `sentence-transformers/all-MiniLM-L6-v2` to `./resources/models/minilm`.
 
-5. **(Optional) Build the vectorstore for RAG/document QA**
+5. **Build the vectorstore for RAG/document QA**
     - Place your docs in `docs/` and set `RAG_DOC_PATH` in `.env`.
     - Then run:
       ```sh

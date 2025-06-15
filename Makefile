@@ -1,6 +1,6 @@
-.PHONY: setup build run clean no-proxy
+.PHONY: install build run clean no-proxy
 
-setup:
+install:
 	python3 -m venv .venv
 	. .venv/bin/activate && pip install -U pip
 	. .venv/bin/activate && pip install -r requirements.txt
