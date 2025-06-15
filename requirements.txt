@@ -11,3 +11,4 @@ faiss-cpu
 transformers>=4.40.0
 torch
 sentence-transformers
+langgraph>=0.0.20
