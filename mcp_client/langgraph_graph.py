@@ -26,6 +26,16 @@ class AgentState(TypedDict, total=False):
     output: str
     user_id: str
     session_id: str
+    
+    
+# === Intent Detection ===
+LTM_KEYWORDS = ["previous", "earlier", "remind", "history", "continue", "past", "last time", "again"]
+
+def keyword_match(text: str) -> bool:
+    return any(keyword in text.lower() for keyword in LTM_KEYWORDS)
+
+async def detect_ltm_intent(user_input: str) -> bool:
+    return keyword_match(user_input)
 
 
 # Initialize LLM and tools
@@ -46,22 +56,27 @@ async def router(state: AgentState) -> AgentState:
 
     # Check if the last message is a HumanMessage and if user requests previous conversation
     if state.get("messages") and isinstance(state["messages"][-1], HumanMessage):
-        user_content = state["messages"][-1].content.lower()
-        if "previous conversation" in user_content:
+        user_input = state["messages"][-1].content.lower()
+        if await detect_ltm_intent(user_input):            
             user_id = state.get("user_id")
             session_id = state.get("session_id")
-            long_term_memory = int(os.getenv("LONG_TERM_MEMORY", 100))
+            logger.info("🔁 Detected intent for long-term memory retrieval.")
+         
+            long_term_memory = int(os.getenv("LONG_TERM_MEMORY"))
+
             if not user_id or not session_id:
-                logger.error("User ID or session ID not set. Cannot fetch previous conversation.")
+                logger.warning("Missing user_id or session_id — cannot fetch LTM.")
                 return {
                     **state,
-                    "output": "⚠️ User ID or session ID not set.",
-                    "messages": state["messages"] + [AIMessage(content="⚠️ User ID or session ID not set.")]
+                    "output": "⚠️ Cannot recall past conversation without user/session context.",
+                    "messages": state["messages"] + [AIMessage(content="⚠️ Missing user/session info.")]
                 }
-            logger.info("Fetching last %d messages for user %s in session %s", 
+
+            logger.info("🔁 LTM triggered — fetching last %d messages from DB for %s / %s",
                         long_term_memory, user_id, session_id)
+
             db_history = get_last_n_messages(user_id, session_id, long_term_memory)
-            # Convert db_history to LangChain messages
+
             context_messages = [system_message] + [
                 HumanMessage(content=msg["content"]) if msg["role"] == "user" else AIMessage(content=msg["content"])
                 for msg in db_history

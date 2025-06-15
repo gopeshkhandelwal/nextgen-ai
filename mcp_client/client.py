@@ -119,8 +119,7 @@ async def run_mcp_client():
             state = {"messages": history, "user_id": USER_ID, "session_id": SESSION_ID}
             response = await graph.ainvoke(state)
             last_message = response.get("messages")[-1]
-            logger.info("✅ Response: %s", last_message.content)
-
+            
             # Store the assistant's response in the database
             store_message(
                 user_id=USER_ID,
@@ -137,6 +136,8 @@ async def run_mcp_client():
 
             # Log both short-term and long-term memory for debugging
             log_memory_debug(history, USER_ID, SESSION_ID, LONG_TERM_MEMORY)
+            
+            logger.info("✅ Final Response: %s", last_message.content)
 
         except Exception as e:
             logger.exception("⚠️ Error processing query: %s", e)
