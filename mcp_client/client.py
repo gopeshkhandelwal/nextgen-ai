@@ -9,12 +9,16 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from langgraph_graph import build_graph
 from langchain_core.messages import HumanMessage
+# Import DB helpers
+from db_utils import store_message
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger("mcp_langgraph")
 
+CURRENT_CONTEXT_HISTORY = int(os.getenv("CURRENT_CONTEXT_HISTORY"))
+SESSION_ID = os.getenv("SESSION_ID")
 history = []
 
 class MCPClient:
@@ -48,6 +52,8 @@ async def main():
 
     graph = build_graph()
 
+    print("Current Context History:", CURRENT_CONTEXT_HISTORY)
+    print("Conversion history:", os.getenv("TOTAL_CONVERSATION_HISTORY"))
     print("\n🤖 LangGraph Agent ready. Type your query or 'quit' to exit.")
     while True:
         user_input = input("📝 Your Query: ").strip()
@@ -56,17 +62,22 @@ async def main():
             break
 
         try:
+            # Store user message in DB
+            store_message(SESSION_ID, "user", user_input)
+            
             history.append(HumanMessage(content=user_input))
             logger.info(f"\n🔄 Processing your query...\n")
             state = {"messages": history}
             response = await graph.ainvoke(state)
             last_message = response.get("messages")[-1]
             logger.info(f"\n✅ {last_message.content}\n")
+           
+           
+            # Store assistant message in DB
+            store_message(SESSION_ID, "assistant", last_message.content)
 
             history.append(last_message)
-            # Only trim if history exceeds 100 (let agent handle trimming for state/history in output)
-            if len(history) > 100:
-                history[:] = history[-100:]
+            history[:] = history[-CURRENT_CONTEXT_HISTORY:]
             
             logger.info(f"Updated History ({len(history)} messages):")
             for i, msg in enumerate(history):

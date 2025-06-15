@@ -9,12 +9,14 @@ import os
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 
+# Import DB helpers
+from db_utils import get_last_n_messages
+
 load_dotenv()
 
 class AgentState(TypedDict, total=False):
     messages: Annotated[List[BaseMessage], add_messages]
     output: str
-    history: List[dict]
 
 logger = logging.getLogger(__name__)
 
@@ -29,31 +31,24 @@ llm = get_llm()
 tools = build_tool_wrappers()
 llm_with_tools = llm.bind_tools(tools)
 
-def update_history(state: AgentState, new_message: dict) -> AgentState:
-    history = state.get("history", [])
-    history.append(new_message)
-    if len(history) > 100:
-        history = history[-100:]
-    return {**state, "history": history}
-
 async def router(state: AgentState) -> AgentState:
     system_message = SystemMessage(
         content="You are a helpful assistant. Use the tools when needed. Do not just repeat the user's question."
     )
+    context_messages = [system_message] + state["messages"]
+
+    # If user asks for previous conversation, fetch last 100 from DB
     if state["messages"] and isinstance(state["messages"][-1], HumanMessage):
         user_content = state["messages"][-1].content.lower()
         if "previous conversation" in user_content:
-            # Pass last 100 messages as context to the LLM
-            context_messages = [system_message] + state["messages"][-100:]
-            ai_msg = await llm_with_tools.ainvoke(context_messages)
-            new_state = {
-                **state,
-                "messages": state["messages"] + [ai_msg],
-                "next": "extract_output"
-            }
-            return new_state
-    # Default: use only last 5 messages for context
-    context_messages = [system_message] + state["messages"][-5:]
+            session_id = os.getenv("SESSION_ID", "user1")
+            db_history = get_last_n_messages(session_id, int(os.getenv("TOTAL_CONVERSATION_HISTORY")))
+            # Convert db_history to LangChain messages
+            context_messages = [system_message] + [
+                HumanMessage(content=msg["content"]) if msg["role"] == "user" else AIMessage(content=msg["content"])
+                for msg in db_history
+            ]
+
     ai_msg = await llm_with_tools.ainvoke(context_messages)
     new_state = {
         **state,
