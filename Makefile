@@ -19,6 +19,9 @@ build-vectorstore:
 	@echo "🔨 Building vector store..."
 	. .venv/bin/activate && python utils/build_vectorstore.py
 
+download-model-minilm:
+	python utils/download_model.py --model sentence-transformers/all-MiniLM-L6-v2 --output_dir ./resources/models/minilm
+
 # === Clean Bytecode ===
 clean:
 	rm -rf .venv vectorstore
