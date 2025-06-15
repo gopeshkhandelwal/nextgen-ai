@@ -1,4 +1,4 @@
-# IDC LLM + MCP + RAG + LangGraph + LangChain Tool-Calling System
+# IDC AI Agent(LLM + MCP + RAG + LangGraph + LangChain + Postgres)
 
 ## Overview
 
