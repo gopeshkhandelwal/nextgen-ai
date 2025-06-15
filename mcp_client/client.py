@@ -15,7 +15,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger("mcp_langgraph")
 
-MAX_HISTORY = 6
 history = []
 
 class MCPClient:
@@ -65,7 +64,9 @@ async def main():
             logger.info(f"\n✅ {last_message.content}\n")
 
             history.append(last_message)
-            history[:] = history[-MAX_HISTORY:]
+            # Only trim if history exceeds 100 (let agent handle trimming for state/history in output)
+            if len(history) > 100:
+                history[:] = history[-100:]
             
             logger.info(f"Updated History ({len(history)} messages):")
             for i, msg in enumerate(history):

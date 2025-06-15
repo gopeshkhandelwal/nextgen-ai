@@ -1,7 +1,7 @@
 from typing import Annotated, List, TypedDict
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage, AIMessage, SystemMessage
+from langchain_core.messages import BaseMessage, AIMessage, SystemMessage, HumanMessage
 from langgraph.prebuilt.tool_node import ToolNode
 import logging
 from langgraph_tool_wrappers import build_tool_wrappers
@@ -11,9 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     messages: Annotated[List[BaseMessage], add_messages]
     output: str
+    history: List[dict]
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +29,38 @@ llm = get_llm()
 tools = build_tool_wrappers()
 llm_with_tools = llm.bind_tools(tools)
 
+def update_history(state: AgentState, new_message: dict) -> AgentState:
+    history = state.get("history", [])
+    history.append(new_message)
+    if len(history) > 100:
+        history = history[-100:]
+    return {**state, "history": history}
+
 async def router(state: AgentState) -> AgentState:
     system_message = SystemMessage(
         content="You are a helpful assistant. Use the tools when needed. Do not just repeat the user's question."
     )
-    messages = [system_message] + state["messages"]
-    ai_msg = await llm_with_tools.ainvoke(messages)
-    return {
+    if state["messages"] and isinstance(state["messages"][-1], HumanMessage):
+        user_content = state["messages"][-1].content.lower()
+        if "previous conversation" in user_content:
+            # Pass last 100 messages as context to the LLM
+            context_messages = [system_message] + state["messages"][-100:]
+            ai_msg = await llm_with_tools.ainvoke(context_messages)
+            new_state = {
+                **state,
+                "messages": state["messages"] + [ai_msg],
+                "next": "extract_output"
+            }
+            return new_state
+    # Default: use only last 5 messages for context
+    context_messages = [system_message] + state["messages"][-5:]
+    ai_msg = await llm_with_tools.ainvoke(context_messages)
+    new_state = {
         **state,
         "messages": state["messages"] + [ai_msg],
         "next": "extract_output"
     }
+    return new_state
 
 def extract_output(state: AgentState) -> AgentState:
     for msg in reversed(state["messages"]):
