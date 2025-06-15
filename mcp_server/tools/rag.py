@@ -6,37 +6,47 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from config import get_llm
 
+# Configure logging for this module
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 def check_env_var(var_name):
+    """
+    Check if an environment variable is set, log and exit if not.
+    """
     value = os.getenv(var_name)
     if not value:
-        logger.critical(f"Environment variable '{var_name}' is not set.")
+        logger.critical("Environment variable '%s' is not set.", var_name)
         sys.exit(1)
     return value
 
 def initialize_rag():
     """
     Initialize the RAG retriever and chain with robust error handling.
+
     Returns:
-        retriever, rag_chain
+        tuple: (retriever, rag_chain)
     Exits the process if a critical error occurs.
     """
     try:
-        INDEX_DIR = check_env_var("RAG_INDEX_DIR")
-        EMBED_MODEL = check_env_var("RAG_EMBED_MODEL")
-        logger.info(f"RAG Vectorstore index: {INDEX_DIR}, Embedding model: {EMBED_MODEL}")
-        if not os.path.exists(EMBED_MODEL):
-            logger.error(f"EMBED_MODEL not found: {EMBED_MODEL}. Please download the model.")
-            exit(1)
-        embedding_model = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+        index_dir = check_env_var("RAG_INDEX_DIR")
+        embed_model = check_env_var("RAG_EMBED_MODEL")
+        logger.info("RAG Vectorstore index: %s, Embedding model: %s", index_dir, embed_model)
+
+        if not os.path.exists(embed_model):
+            logger.error("Embedding model not found: %s. Please download the model.", embed_model)
+            sys.exit(1)
+
+        embedding_model = HuggingFaceEmbeddings(model_name=embed_model)
         if not embedding_model:
-            logger.critical(f"Failed to load embedding model: {EMBED_MODEL}. Please download the model.")
+            logger.critical("Failed to load embedding model: %s. Please download the model.", embed_model)
             sys.exit(1)
-        if not os.path.exists(INDEX_DIR):
-            logger.critical(f"FAISS index not found at {INDEX_DIR}. Please build the vectorstore.")
+
+        if not os.path.exists(index_dir):
+            logger.critical("FAISS index not found at %s. Please build the vectorstore.", index_dir)
             sys.exit(1)
-        vectorstore = FAISS.load_local(INDEX_DIR, embedding_model, allow_dangerous_deserialization=True)
+
+        vectorstore = FAISS.load_local(index_dir, embedding_model, allow_dangerous_deserialization=True)
         retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
         rag_chain = RetrievalQA.from_chain_type(
             llm=get_llm(),
@@ -46,13 +56,16 @@ def initialize_rag():
         logger.info("FAISS vectorstore and RAG chain loaded successfully.")
         return retriever, rag_chain
     except Exception as e:
-        logger.critical(f"Failed to initialize RAG pipeline: {e}", exc_info=True)
+        logger.critical("Failed to initialize RAG pipeline: %s", e, exc_info=True)
         sys.exit(1)
 
 # Initialize RAG components at startup
 retriever, rag_chain = initialize_rag()
 
 def register_tools(mcp):
+    """
+    Register RAG-based document QA tool with the MCP server.
+    """
     @mcp.tool()
     async def document_qa(question: str) -> str:
         """
@@ -67,7 +80,7 @@ def register_tools(mcp):
         - Using grpcurl for testing or exploration
         - Service operations like InstanceService, VNetService, MachineImageService, etc.
         """
-        logger.info(f"Tool called: document_qa with question: {question}")
+        logger.info("Tool called: document_qa with question: %s", question)
         if retriever is None or rag_chain is None:
             logger.error("RAG vectorstore or chain is not available.")
             return "RAG vectorstore or chain is not available."
@@ -80,5 +93,5 @@ def register_tools(mcp):
             logger.info("Returning synthesized answer from RAG chain.")
             return answer.strip()
         except Exception as e:
-            logger.error(f"Error retrieving or synthesizing answer: {e}", exc_info=True)
+            logger.error("Error retrieving or synthesizing answer: %s", e, exc_info=True)
             return "Error retrieving or synthesizing answer from vectorstore."
