@@ -27,16 +27,15 @@ class AgentState(TypedDict, total=False):
     user_id: str
     session_id: str
     
-    
-# === Intent Detection ===
-LTM_KEYWORDS = ["previous", "earlier", "remind", "history", "continue", "past", "last time", "again"]
-
-def keyword_match(text: str) -> bool:
-    return any(keyword in text.lower() for keyword in LTM_KEYWORDS)
-
-async def detect_ltm_intent(user_input: str) -> bool:
-    return keyword_match(user_input)
-
+# Function to check if the LLM response is low-confidence
+async def is_low_confidence(content: str) -> bool:
+    """
+    Check if the response contains any low-confidence phrases.
+    These phrases are configurable via the LOW_CONFIDENCE_PHRASES env variable.
+    """
+    phrases = os.getenv("LOW_CONFIDENCE_PHRASES", "")
+    low_conf_phrases = [p.strip().lower() for p in phrases.split(",") if p.strip()]
+    return any(phrase in content.lower() for phrase in low_conf_phrases)
 
 # Initialize LLM and tools
 llm = get_llm()
@@ -46,50 +45,41 @@ llm_with_tools = llm.bind_tools(tools)
 async def router(state: AgentState) -> AgentState:
     """
     Router node for the agent:
-    - Uses short-term memory by default.
-    - If the user asks for 'previous conversation', fetches long-term memory from the database.
+    - Uses short-term memory by default.    
+    - Automatically retries with long-term memory if LLM response is low-confidence.
     """
     system_message = SystemMessage(
         content="You are a helpful assistant. Use the tools when needed. Do not just repeat the user's question."
     )
     context_messages = [system_message] + state.get("messages", [])
-
-    # Check if the last message is a HumanMessage and if user requests previous conversation
-    if state.get("messages") and isinstance(state["messages"][-1], HumanMessage):
-        user_input = state["messages"][-1].content.lower()
-        if await detect_ltm_intent(user_input):            
-            user_id = state.get("user_id")
-            session_id = state.get("session_id")
-            logger.info("🔁 Detected intent for long-term memory retrieval.")
-         
-            long_term_memory = int(os.getenv("LONG_TERM_MEMORY"))
-
-            if not user_id or not session_id:
-                logger.warning("Missing user_id or session_id — cannot fetch LTM.")
-                return {
-                    **state,
-                    "output": "⚠️ Cannot recall past conversation without user/session context.",
-                    "messages": state["messages"] + [AIMessage(content="⚠️ Missing user/session info.")]
-                }
-
-            logger.info("🔁 LTM triggered — fetching last %d messages from DB for %s / %s",
-                        long_term_memory, user_id, session_id)
-
-            db_history = get_last_n_messages(user_id, session_id, long_term_memory)
-
-            context_messages = [system_message] + [
-                HumanMessage(content=msg["content"]) if msg["role"] == "user" else AIMessage(content=msg["content"])
-                for msg in db_history
-            ]
-
-    # Call the LLM with the constructed context
+    logger.info("🔄 Router invoked with %d messages using short-term memory.", len(context_messages))
+    
     ai_msg = await llm_with_tools.ainvoke(context_messages)
-    new_state = {
+    logger.info("🧠 LLM response: %s", ai_msg.content)
+
+     # Check for low confidence
+    if await is_low_confidence(ai_msg.content):
+        logger.warning("⚠️ Low-confidence response detected — switching to long-term memory.")
+        user_id = state.get("user_id")
+        session_id = state.get("session_id")
+
+        if user_id and session_id:
+            ltm_history = get_last_n_messages(user_id, session_id, int(os.getenv("LONG_TERM_MEMORY")))
+            context_messages = [system_message] + [
+                HumanMessage(content=m["content"]) if m["role"] == "user" else AIMessage(content=m["content"])
+                for m in ltm_history
+            ]
+            context_messages.append(state["messages"][-1])
+            ai_msg = await llm_with_tools.ainvoke(context_messages)
+            logger.info("🔁 Retried with LTM. New response: %s", ai_msg.content)
+        else:
+            logger.warning("⚠️ LTM fetch skipped due to missing user/session info.")
+
+    return {
         **state,
         "messages": state["messages"] + [ai_msg],
         "next": "extract_output"
     }
-    return new_state
 
 def extract_output(state: AgentState) -> AgentState:
     """
