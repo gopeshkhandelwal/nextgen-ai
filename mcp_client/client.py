@@ -1,145 +1,80 @@
 import asyncio
 import os
 import sys
-import json
 import logging
 from contextlib import AsyncExitStack
 from typing import Optional
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from openai import OpenAI
+from langgraph_graph import build_graph
+from langchain_core.messages import HumanMessage
 
-# === Load environment variables from .env ===
 load_dotenv()
 
-# === Configure Logging ===
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s - %(name)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger("mcp_client")
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
+logger = logging.getLogger("mcp_langgraph")
 
-# === Initialize OpenAI Client ===
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
-)
-
-MODEL = os.getenv("OPENAI_MODEL")
-logger.info("Using OpenAI model: %s", MODEL)
+MAX_HISTORY = 6
+history = []
 
 class MCPClient:
     def __init__(self):
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
 
-    async def connect_to_server(self, script_path: str):
-        server_params = StdioServerParameters(command="python3", args=[script_path], env=os.environ.copy())
+    async def connect(self, server_script: str):
+        server_params = StdioServerParameters(command="python3", args=[server_script], env=os.environ.copy())
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
         self.stdio, self.write = stdio_transport
         self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
         await self.session.initialize()
-        tools = await self.session.list_tools()
-        logger.info("✅ Connected to MCP server with tools: %s", [t.name for t in tools.tools])
+        logger.info("✅ MCP server connected with tools: %s", [t.name for t in (await self.session.list_tools()).tools])
+        return self.session
 
-    async def process_query(self, query: str) -> str:
-        if not self.session:
-            return "MCP session not initialized."
-
-        messages = [{"role": "user", "content": query}]
-        tool_response = await self.session.list_tools()
-
-        available_tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description or f"Tool named {tool.name}",
-                    "parameters": tool.inputSchema or {"type": "object", "properties": {}}
-                }
-            }
-            for tool in tool_response.tools
-        ]
-
-        logger.info("🔧 Tools registered: %s", [tool['function']['name'] for tool in available_tools])
-
-        logger.info("📝 Sending query to LLM: %s", query)
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=messages,
-            tools=available_tools,
-            tool_choice="auto"
-        )
-
-        message = response.choices[0].message
-        logger.debug("🧠 LLM initial response:\n%s", message)
-
-        tool_calls = message.tool_calls or []
-        final_output = []
-
-        if tool_calls:
-            for call in tool_calls:
-                tool_name = call.function.name
-                tool_args = eval(call.function.arguments)
-                logger.info("🔧 Tool call from LLM: %s(%s)", tool_name, tool_args)
-
-                tool_result = await self.session.call_tool(tool_name, tool_args)
-                logger.info("🔙 Tool result: %s", tool_result.content)
-
-                # Append tool interaction to messages
-                messages = [
-                    {"role": "system", "content": "You are an assistant that helps with cloud infrastructure tasks using tool results."},
-                    {"role": "user", "content": query}
-                ]
-                messages.append({
-                    "role": "assistant",
-                    "tool_calls": [call.model_dump()]
-                })
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call.id,
-                    "content": str(tool_result.content[0].text)
-                })
-
-            logger.debug("📨 Final prompt with tool result:\n%s", json.dumps(messages, indent=2))
-
-            followup = client.chat.completions.create(
-                model=MODEL,
-                messages=messages
-            )
-            final_response = followup.choices[0].message.content
-            logger.info("✅ Final LLM Response:\n%s", final_response)
-            final_output.append(final_response)
-        else:
-            final_output.append(message.content)
-
-        return "\n".join(final_output)
-
-
-    async def chat_loop(self):
-        logger.info("🧠 LLM + MCP Tool Client started")
-        while True:
-            query = input("\nQuery (or 'quit'): ").strip()
-            if query.lower() == "quit":
-                break
-            response = await self.process_query(query)
-            logger.info("\n📣 Response:\n%s", response)
-
-    async def cleanup(self):
+    async def close(self):
         await self.exit_stack.aclose()
 
 async def main():
+    print("Starting MCP client...")
     if len(sys.argv) < 2:
         logger.error("Usage: python client.py server.py")
         return
-    client = MCPClient()
-    try:
-        await client.connect_to_server(sys.argv[1])
-        await client.chat_loop()
-    finally:
-        await client.cleanup()
+
+    mcp = MCPClient()
+    await mcp.connect(sys.argv[1])
+
+    import langgraph_tool_wrappers
+    langgraph_tool_wrappers.client_session = mcp.session
+
+    graph = build_graph()
+
+    print("\n🤖 LangGraph Agent ready. Type your query or 'quit' to exit.")
+    while True:
+        user_input = input("📝 Your Query: ").strip()
+        if user_input.lower() in ["quit", "exit"]:
+            logger.info("👋 Exiting. Goodbye!")
+            break
+
+        try:
+            history.append(HumanMessage(content=user_input))
+            logger.info(f"\n🔄 Processing your query...\n")
+            state = {"messages": history}
+            response = await graph.ainvoke(state)
+            last_message = response.get("messages")[-1]
+            logger.info(f"\n✅ {last_message.content}\n")
+
+            history.append(last_message)
+            history[:] = history[-MAX_HISTORY:]
+            
+            logger.info(f"Updated History ({len(history)} messages):")
+            for i, msg in enumerate(history):
+                logger.info(f"  {i + 1}: {msg.content}")
+
+        except Exception as e:
+            logger.error(f"⚠️ Error: {e}\n")
+
+    await mcp.close()
 
 if __name__ == "__main__":
     asyncio.run(main())

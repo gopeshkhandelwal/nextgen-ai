@@ -20,7 +20,9 @@ if not DOC_PATH or not INDEX_DIR or not EMBED_MODEL:
     exit(1)
 
 logger.info(f"DOC_PATH: {DOC_PATH}, INDEX_DIR: {INDEX_DIR}, EMBED_MODEL: {EMBED_MODEL}")
-
+if not os.path.exists(EMBED_MODEL):
+    logger.error(f"EMBED_MODEL not found: {EMBED_MODEL}. Please download the model.")
+    exit(1)
 os.makedirs(os.path.dirname(INDEX_DIR), exist_ok=True)
 
 try:

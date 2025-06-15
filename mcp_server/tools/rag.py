@@ -26,7 +26,13 @@ def initialize_rag():
         INDEX_DIR = check_env_var("RAG_INDEX_DIR")
         EMBED_MODEL = check_env_var("RAG_EMBED_MODEL")
         logger.info(f"RAG Vectorstore index: {INDEX_DIR}, Embedding model: {EMBED_MODEL}")
+        if not os.path.exists(EMBED_MODEL):
+            logger.error(f"EMBED_MODEL not found: {EMBED_MODEL}. Please download the model.")
+            exit(1)
         embedding_model = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+        if not embedding_model:
+            logger.critical(f"Failed to load embedding model: {EMBED_MODEL}. Please download the model.")
+            sys.exit(1)
         if not os.path.exists(INDEX_DIR):
             logger.critical(f"FAISS index not found at {INDEX_DIR}. Please build the vectorstore.")
             sys.exit(1)
