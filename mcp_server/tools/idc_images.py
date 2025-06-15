@@ -3,13 +3,22 @@ import logging
 import httpx
 from dotenv import load_dotenv
 
+# Configure logging for this module
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
 load_dotenv()
 
+# Read IDC API configuration from environment
 IDC_API_TOKEN = os.getenv("IDC_API_TOKEN")
 IDC_API_IMAGES = os.getenv("IDC_API_IMAGES")
 
 def register_tools(mcp):
+    """
+    Register IDC-related tools with the MCP server.
+    """
+
     @mcp.tool()
     async def list_idc_images() -> str:
         """
@@ -26,10 +35,15 @@ def register_tools(mcp):
         - A newline-separated string of image names, or an error message if the request fails.
         """
         logger.info("Tool called: list_idc_images")
+
         if not IDC_API_TOKEN:
+            logger.error("IDC API token not configured. Please set IDC_API_TOKEN in your environment.")
             return "IDC API token not configured. Please set IDC_API_TOKEN in your environment."
 
-        logger.info(f"IDC_API_IMAGES: {IDC_API_IMAGES}")
+        if not IDC_API_IMAGES:
+            logger.error("IDC API images endpoint not configured. Please set IDC_API_IMAGES in your environment.")
+            return "IDC API images endpoint not configured. Please set IDC_API_IMAGES in your environment."
+
         headers = {"Authorization": f"Bearer {IDC_API_TOKEN}"}
         try:
             async with httpx.AsyncClient() as client:
@@ -37,7 +51,12 @@ def register_tools(mcp):
                 response.raise_for_status()
                 data = response.json()
                 image_names = [item["metadata"]["name"] for item in data.get("items", [])]
-                return "\n".join(image_names or ["No images found."])
+                if image_names:
+                    logger.info("Fetched %d IDC images.", len(image_names))
+                    return "\n".join(image_names)
+                else:
+                    logger.info("No images found in IDC API response.")
+                    return "No images found."
         except Exception as e:
-            logger.exception("Error fetching IDC images", e)
+            logger.exception("Error fetching IDC images")
             return "Failed to retrieve IDC image list."

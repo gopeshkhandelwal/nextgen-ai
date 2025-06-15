@@ -3,13 +3,22 @@ import logging
 import httpx
 from dotenv import load_dotenv
 
+# Configure logging for this module
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
 load_dotenv()
 
+# Read IDC API configuration from environment
 IDC_API_TOKEN = os.getenv("IDC_API_TOKEN")
 IDC_API_POOLS = os.getenv("IDC_API_POOLS")
 
 def register_tools(mcp):
+    """
+    Register IDC-related tools with the MCP server.
+    """
+
     @mcp.tool()
     async def list_idc_pools() -> str:
         """
@@ -26,10 +35,15 @@ def register_tools(mcp):
         - A newline-separated string of compute pool names, or an error message if none are found.
         """
         logger.info("Tool called: list_idc_pools")
+
         if not IDC_API_TOKEN:
+            logger.error("IDC API token not configured. Please set IDC_API_TOKEN in your environment.")
             return "IDC API token not configured. Please set IDC_API_TOKEN in your environment."
         
-        logger.info(f"IDC_API_POOLS: {IDC_API_POOLS}")
+        if not IDC_API_POOLS:
+            logger.error("IDC API pools endpoint not configured. Please set IDC_API_POOLS in your environment.")
+            return "IDC API pools endpoint not configured. Please set IDC_API_POOLS in your environment."
+
         headers = {"Authorization": f"Bearer {IDC_API_TOKEN}"}
 
         try:

@@ -9,6 +9,7 @@ This project provides a production-ready system for integrating Large Language M
 - **LLM-powered agent**: Supports both OpenAI GPT models (via API) and local Hugging Face models (Llama, Mistral, etc.).
 - **LangGraph orchestration**: Multi-tool, multi-step agent workflow using LangGraph for robust, extensible logic.
 - **RAG (Retrieval-Augmented Generation)**: Document Q&A via FAISS vectorstore and embeddings.
+- **Conversation Memory**: Short-Term and Long-Term (PostgreSQL).
 - **Secure tool execution**: All tool calls are routed through the MCP server, with authentication and logging.
 - **Extensible tool registry**: Easily add new tools for cloud, infrastructure, or document Q&A.
 - **Async and streaming support**: Fast, scalable, and ready for production workloads.
@@ -83,11 +84,28 @@ See `.env.example` for all required and optional variables, including:
 
 ## Troubleshooting
 
+- **Failed to retrieve IDC pools/images**: Ensure your tool is not using Proxy.
+`export NO_PROXY=`
+`export no_proxy=`
+
 - **ModuleNotFoundError**: Ensure you are running from the project root and using `make` targets.
 - **Model not found**: Check `RAG_EMBED_MODEL` and Hugging Face token.
 - **Vectorstore errors**: Ensure you have built the vectorstore and set `RAG_INDEX_DIR` correctly.
 - **Rate limits**: Use a Hugging Face token and cache models locally.
 - **Tool not called**: Ensure your tool is registered and appears in the agent's tool list.
+
+## PostgreSQL Setup for Long-Term Memory
+
+This project uses PostgreSQL to persist all conversation history for long-term memory.  
+To enable this feature:
+
+1. **Install PostgreSQL** on your system.
+2. **Create a database and user** (e.g., `chatdb` and `chatuser`).
+3. **Create the `conversation_history` table** using the schema provided in this README.
+4. **Set your database credentials** in the `.env` file:
+5. **Restart the application** to enable persistent conversation memory.
+
+All user and assistant messages will now be stored in PostgreSQL, enabling robust long-term memory and analytics.
 
 ---
 
@@ -96,4 +114,4 @@ See `.env.example` for all required and optional variables, including:
 ---
 
 **Security Reminder:**  
-Never commit real secrets or tokens. Use secure
+Never commit real secrets or tokens. Use secure methods to handle sensitive information in production environments.
