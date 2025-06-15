@@ -4,7 +4,7 @@ import logging
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
-from config import get_llm
+from common_utils.config import get_llm
 
 # Configure logging for this module
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')

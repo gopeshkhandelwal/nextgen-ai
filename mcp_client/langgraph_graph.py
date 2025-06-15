@@ -9,6 +9,7 @@ from langgraph.prebuilt.tool_node import ToolNode
 from langgraph_tool_wrappers import build_tool_wrappers
 from langchain_openai import ChatOpenAI
 from db_utils import get_last_n_messages
+from common_utils.config import get_llm
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,15 +27,6 @@ class AgentState(TypedDict, total=False):
     user_id: str
     session_id: str
 
-def get_llm():
-    """
-    Initialize and return the language model with environment configuration.
-    """
-    return ChatOpenAI(
-        model_name=os.getenv("OPENAI_MODEL", "gpt-4"),
-        max_tokens=128,
-        temperature=0
-    )
 
 # Initialize LLM and tools
 llm = get_llm()
