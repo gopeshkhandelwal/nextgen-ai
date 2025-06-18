@@ -31,29 +31,39 @@ This project provides a production-ready system for integrating Large Language M
     make install
     ```
 
-3. **Configure environment**
+3. **Install PostgreSQL**
+    Install PostgreSQL on your system.
+    For Ubuntu/Debian:
+    ```sh
+    sudo apt-get update
+    sudo apt-get install -y postgresql postgresql-contrib
+    ```
+    For other operating systems, see: https://www.postgresql.org/download/
+
+4. **Configure environment**
     - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).
+    - Set `Database Configuration`.
     - Set `RAG_EMBED_MODEL` to a local model path (e.g., `./resources/models/minilm`) after downloading.
 
-4. **Download and prepare models (for local LLMs)**
+5. **Download and prepare models (for local LLMs)**
     ```sh
     make download-model-minilm
     ```
     - This will download `sentence-transformers/all-MiniLM-L6-v2` to `./resources/models/minilm`.
 
-5. **Build the vectorstore for RAG/document QA**
+6. **Build the vectorstore for RAG/document QA**
     - Place your docs in `docs/` and set `RAG_DOC_PATH` in `.env`.
     - Then run:
       ```sh
       make build-vectorstore
       ```
 
-6. **Start the application**
+7. **Start the application**
     ```sh
     make run-mcp
     ```
 
-7. **Interact**
+8. **Interact**
     - Enter natural language queries (e.g., "List all IDC pools", "What is the weather in Dallas?", "What is a ComputePool?").
     - The agent will select and call the appropriate tool, returning the result.
 
