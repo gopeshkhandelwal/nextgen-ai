@@ -31,14 +31,17 @@ This project provides a production-ready system for integrating Large Language M
     make install
     ```
 
-3. **Install PostgreSQL**
+3. **Install & Setup PostgreSQL**
     Install PostgreSQL on your system.
     For Ubuntu/Debian:
     ```sh
     sudo apt-get update
     sudo apt-get install -y postgresql postgresql-contrib
     ```
-    For other operating systems, see: https://www.postgresql.org/download/
+    
+
+    Create Database objects
+        idc-llm-mcp/common_utils/database/*.sql
 
 4. **Configure environment**
     - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).
