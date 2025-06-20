@@ -19,7 +19,7 @@ def register_tools(mcp):
     Register IDC-related tools with the MCP server.
     """
 
-    @mcp.tool()
+    @mcp.tool(name="list_idc_pools")
     async def list_idc_pools() -> str:
         """
         Fetch and return a list of available IDC compute node pool names.
