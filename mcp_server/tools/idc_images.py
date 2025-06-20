@@ -19,22 +19,22 @@ def register_tools(mcp):
     Register IDC-related tools with the MCP server.
     """
 
-    @mcp.tool()
-    async def list_idc_images() -> str:
+    @mcp.tool(
+    name="machine_images",
+    description="List all available IDC machine images used to launch compute nodes."
+    )
+    async def machine_images() -> str:
         """
-        Fetch and return a list of available IDC machine image names.
+        List all available IDC machine images (for launching compute nodes).
 
-        This tool queries the IDC Compute API using an authenticated request and returns the
-        metadata.name of each image found in the response.
+        Use this tool if the user asks about images, machine images, or available options for creating nodes.
 
-        Requirements:
-        - The environment variable IDC_API_TOKEN must be set.
-        - The endpoint URL must be provided via IDC_API_IMAGES.
-
-        Returns:
-        - A newline-separated string of image names, or an error message if the request fails.
+        Example queries:
+        - 'List all available IDC images'
+        - 'What images can I use to create nodes?'
+        - 'Show machine images available in IDC'
         """
-        logger.info("Tool called: list_idc_images")
+        logger.info("Tool called: list_idc_machine_images")
 
         if not IDC_API_TOKEN:
             logger.error("IDC API token not configured. Please set IDC_API_TOKEN in your environment.")
