@@ -10,7 +10,7 @@ from langgraph_tool_wrappers import build_tool_wrappers
 from langchain_openai import ChatOpenAI
 from db_utils import get_last_n_messages
 from common_utils.config import get_llm
-from common_utils.utils import to_openai_dict
+from common_utils.utils import to_openai_dict, sanitize_message_history
 import json
 
 # Load environment variables from .env file
@@ -54,6 +54,10 @@ async def router(state: AgentState) -> AgentState:
         content="You are a helpful assistant. Use the tools when needed. Do not just repeat the user's question."
     )
     context_messages = [system_message] + state.get("messages", [])
+    
+    # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+    context_messages = sanitize_message_history(context_messages)
+    
     logger.info("🔄 Router invoked with %d messages using short-term memory.", len(context_messages))
     json_ready = [to_openai_dict(m) for m in context_messages]
     logger.info("📤 Final STM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
@@ -72,20 +76,12 @@ async def router(state: AgentState) -> AgentState:
 
         if user_id and session_id:
             ltm_history = get_last_n_messages(user_id, session_id, int(os.getenv("LONG_TERM_MEMORY")))
-
+            ltm_history = sanitize_message_history(ltm_history)
+            context_messages = [system_message] + ltm_history
+  
             # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
-            # Remove leading assistant messages
-            while ltm_history and ltm_history[0]["role"] == "assistant":
-                ltm_history.pop(0)
-            # Remove trailing assistant messages
-            while ltm_history and ltm_history[-1]["role"] == "assistant":
-                ltm_history.pop()
-
-            context_messages = [system_message] + [
-                HumanMessage(content=m["content"]) if m["role"] == "user" else AIMessage(content=m["content"])
-                for m in ltm_history
-            ]
-            logger.info("🔄 Retrying with LTM. Context messages: %d", len(context_messages))
+            context_messages = sanitize_message_history(context_messages)
+            logger.info("🔄 Router invoked with %d messages using long-term memory.", len(context_messages))
             json_ready = [to_openai_dict(m) for m in context_messages]
             logger.info("📤 Final LTM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
             
