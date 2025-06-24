@@ -29,5 +29,10 @@ def get_llm():
     return ChatOpenAI(
         model=openai_model,
         temperature=0.2,
-        openai_api_key=openai_api_key
+        openai_api_key=openai_api_key,
+        request_timeout=60,
+        model_kwargs={
+            "tool_choice": "auto"
+        }
+        verbose=True
     )
