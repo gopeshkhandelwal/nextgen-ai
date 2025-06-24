@@ -44,8 +44,8 @@ async def is_low_confidence(content: str) -> bool:
 tools = build_tool_wrappers()
 
 # Initialize LLM + bind tools if OpenAI
-llm, is_openai = get_llm(tool_mode=True)
-llm_with_tools = llm.bind_tools(tools) if is_openai else llm
+llm, _ = get_llm(tool_mode=True)
+llm_with_tools = llm.bind_tools(tools)
 
 async def router(state: AgentState) -> AgentState:
     """
