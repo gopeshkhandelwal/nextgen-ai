@@ -12,7 +12,7 @@ from db_utils import get_last_n_messages
 from common_utils.config import get_llm
 from common_utils.utils import to_openai_dict, sanitize_message_history
 import json
-from langchain.callbacks.base import BaseCallbackHandler
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -40,10 +40,12 @@ async def is_low_confidence(content: str) -> bool:
     low_conf_phrases = [p.strip().lower() for p in phrases.split(",") if p.strip()]
     return any(phrase in content.lower() for phrase in low_conf_phrases)
 
-# Initialize LLM and tools
-llm = get_llm()
+# Load tools
 tools = build_tool_wrappers()
-llm_with_tools = llm.bind_tools(tools)
+
+# Initialize LLM + bind tools if OpenAI
+llm, is_openai = get_llm(tool_mode=True)
+llm_with_tools = llm.bind_tools(tools) if is_openai else llm
 
 async def router(state: AgentState) -> AgentState:
     """
@@ -63,7 +65,7 @@ async def router(state: AgentState) -> AgentState:
     json_ready = [to_openai_dict(m) for m in context_messages]
     logger.info("📤 Final STM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
     
-    ai_msg = await llm_with_tools.ainvoke(context_messages, callbacks=[PrintPayloadCallbackHandler()])
+    ai_msg = await llm_with_tools.ainvoke(context_messages)
     if ai_msg.content.strip():
         logger.info("🧠 LLM responded: %s", ai_msg.content)
     else:
@@ -87,7 +89,7 @@ async def router(state: AgentState) -> AgentState:
             logger.info("📤 Final LTM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
             
             # Retry with long-term memory
-            ai_msg = await llm_with_tools.ainvoke(context_messages, callbacks=[PrintPayloadCallbackHandler()])
+            ai_msg = await llm_with_tools.ainvoke(context_messages)
             logger.info("🔁 Retried with LTM. New response: %s", ai_msg.content)
         else:
             logger.warning("⚠️ LTM fetch skipped due to missing user/session info.")
@@ -128,9 +130,3 @@ def build_graph():
     builder.add_edge("extract_output", END)
     builder.set_entry_point("router")
     return builder.compile()
-
-class PrintPayloadCallbackHandler(BaseCallbackHandler):
-    def on_llm_start(self, serialized, prompts, **kwargs):
-        print("Prompt(s) to LLM:", prompts)
-        print("Serialized config:", serialized)
-        print("Other kwargs:", kwargs)
