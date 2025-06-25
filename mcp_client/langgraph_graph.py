@@ -13,6 +13,7 @@ from common_utils.config import get_llm
 from common_utils.utils import to_openai_dict, sanitize_message_history
 import json
 
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -39,9 +40,11 @@ async def is_low_confidence(content: str) -> bool:
     low_conf_phrases = [p.strip().lower() for p in phrases.split(",") if p.strip()]
     return any(phrase in content.lower() for phrase in low_conf_phrases)
 
-# Initialize LLM and tools
-llm = get_llm()
+# Load tools
 tools = build_tool_wrappers()
+
+# Initialize LLM + bind tools if OpenAI
+llm, _ = get_llm(tool_mode=True)
 llm_with_tools = llm.bind_tools(tools)
 
 async def router(state: AgentState) -> AgentState:

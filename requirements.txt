@@ -13,3 +13,4 @@ torch
 sentence-transformers
 langgraph>=0.0.20
 psycopg2-binary
+vllm
