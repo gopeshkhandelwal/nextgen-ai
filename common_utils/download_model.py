@@ -1,6 +1,11 @@
 import argparse
 import logging
 from huggingface_hub import snapshot_download
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s - %(message)s')
@@ -16,7 +21,11 @@ def download_model(model_name: str, output_dir: str):
     """
     logger.info("Starting download: %s --> %s", model_name, output_dir)
     try:
-        snapshot_download(repo_id=model_name, local_dir=output_dir)
+        snapshot_download(
+            repo_id=model_name,
+            local_dir=output_dir,
+            token=os.getenv("HUGGINGFACE_HUB_TOKEN")
+        )
         logger.info("✅ Model downloaded successfully to %s", output_dir)
     except Exception as e:
         logger.exception("❌ Failed to download model: %s", e)

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-fork-with-llama-2-7b-chat-hf
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: vllm-fork-with-llama-2-7b-chat-hf
+  template:
+    metadata:
+      labels:
+        name: vllm-fork-with-llama-2-7b-chat-hf
+    spec:
+      hostNetwork: true
+      hostIPC: true
+      containers:
+      - name: vllm-fork-with-llama-2-7b-chat-hf
+        image: vllm-fork:2.0
+        imagePullPolicy: IfNotPresent
+        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+          - --port
+          - "8000"
+          - --model
+          - /app/models/Llama-2-7b-chat-hf
+          - --served-model-name
+          - vllm-fork-with-llama-2-7b-chat-hf
+          - --max-model-len
+          - "4096"
+          - --max-num-seqs
+          - "4"
+          - --tensor-parallel-size
+          - "8"
+          - --enable-auto-tool-choice
+          - --tool-call-parser
+          - llama4_json
+          - --disable-log-stats
+          - --tokenizer-pool-type
+          - none
+          - --gpu-memory-utilization
+          - "0.9"
+          - --enforce-eager
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: HF_TOKEN
+        - name: HABANA_VISIBLE_DEVICES
+          value: all
+        - name: OMPI_MCA_btl_vader_single_copy_mechanism
+          value: "none"
+        - name: VLLM_ALLOW_LONG_MAX_MODEL_LEN
+          value: "1"
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["SYS_NICE"]
+        resources:
+          limits:
+            habana.ai/gaudi: "8"
+            memory: "75Gi"
+          requests:
+            habana.ai/gaudi: "8"
+            memory: "75Gi"
+

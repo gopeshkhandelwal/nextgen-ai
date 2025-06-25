@@ -48,8 +48,9 @@ def initialize_rag():
 
         vectorstore = FAISS.load_local(index_dir, embedding_model, allow_dangerous_deserialization=True)
         retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
+        llm, _ = get_llm(tool_mode=False)
         rag_chain = RetrievalQA.from_chain_type(
-            llm=get_llm(),
+            llm=llm,
             retriever=retriever,
             chain_type="stuff"
         )
