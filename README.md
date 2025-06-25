@@ -1,4 +1,4 @@
-# IDC AI Agent(LLM + MCP + RAG + LangGraph + LangChain + Postgres)
+# ITAC AI Agent(LLM + MCP + RAG + LangGraph + LangChain + Postgres)
 
 ## Overview
 
@@ -41,7 +41,7 @@ This project provides a production-ready system for integrating Large Language M
     
 
     Create Database objects
-        idc-llm-mcp/common_utils/database/*.sql
+        nextgen-ai/common_utils/database/*.sql
 
 4. **Configure environment**
     - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).
