@@ -1,8 +1,8 @@
-# IDC AI Agent(LLM + MCP + RAG + LangGraph + LangChain + Postgres)
+# ITAC AI Agent (An end-to-end GenAI framework)
 
 ## Overview
 
-This project provides a production-ready system for integrating Large Language Models (LLMs) with Intel Developer Cloud (IDC) and MCP (Model Context Protocol) using RAG + LangGraph + LangChain Tool-Calling capabilities. It enables natural language queries to trigger secure, auditable actions on cloud infrastructure using open-source LLMs (e.g., Llama, Mistral) or OpenAI-compatible APIs, and a robust tool execution backend orchestrated by LangGraph.
+The ITAC AI Agent is a modular, production-ready framework that integrates Large Language Models (LLMs) with Intel Developer Cloud (IDC) and MCP (Model Context Protocol) to enable intelligent agentic behavior. It combines LangGraph-based orchestration, LangChain tool-calling, and RAG-powered memory with secure, auditable tool execution. The system supports natural language queries that trigger real cloud actions—backed by open-source LLMs (e.g., LLaMA, Mistral) or OpenAI-compatible APIs—and demonstrates scalable, secure integration of advanced GenAI components across infrastructure.
 
 ## Features
 
