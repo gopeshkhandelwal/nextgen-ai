@@ -1,4 +1,4 @@
-# ITAC AI Agent(LLM + MCP + RAG + LangGraph + LangChain + Postgres)
+# ITAC AI Agent (An end-to-end GenAI framework)
 
 ## Overview
 
