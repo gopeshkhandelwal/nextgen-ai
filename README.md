@@ -4,6 +4,14 @@
 
 The ITAC AI Agent is a modular, production-ready framework that integrates Large Language Models (LLMs) with Intel Developer Cloud (IDC) and MCP (Model Context Protocol) to enable intelligent agentic behavior. It combines LangGraph-based orchestration, LangChain tool-calling, and RAG-powered memory with secure, auditable tool execution. The system supports natural language queries that trigger real cloud actions—backed by open-source LLMs (e.g., LLaMA, Mistral) or OpenAI-compatible APIs—and demonstrates scalable, secure integration of advanced GenAI components across infrastructure.
 
+## Architecture
+
+### Component Diagram
+![Component Diagram](assets/component_diagram.png)
+
+### Sequence Diagram
+![Sequence Diagram](assets/sequence_diagram.png)
+
 ## Features
 
 - **LLM-powered agent**: Supports both OpenAI GPT models (via API) and local Hugging Face models (Llama, Mistral, etc.).
