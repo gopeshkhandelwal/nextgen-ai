@@ -54,7 +54,13 @@ async def router(state: AgentState) -> AgentState:
     - Automatically retries with long-term memory if LLM response is low-confidence.
     """
     system_message = SystemMessage(
-        content="You are a helpful assistant. Use the tools when needed. Do not just repeat the user's question."
+        content="""You are a helpful assistant. Use the tools when needed. 
+        
+        IMPORTANT: When calling tools, preserve the user's EXACT question including all qualifiers 
+        like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
+        These words are important for determining the quality and depth of the response.
+        
+        Do not simplify or paraphrase the user's question when calling tools."""
     )
     context_messages = [system_message] + state.get("messages", [])
     

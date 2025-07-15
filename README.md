@@ -49,7 +49,7 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
     
 
     Create Database objects
-        idc-llm-mcp/common_utils/database/*.sql
+        nextgen-ai/common_utils/database/*.sql
 
 4. **Configure environment**
     - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).

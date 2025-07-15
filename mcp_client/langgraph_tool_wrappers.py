@@ -4,9 +4,7 @@ from mcp import ClientSession
 client_session: ClientSession = None  # Will be set by main client
 
 def build_tool_wrappers():
-    '''Builds tool wrappers for the MCP client session.
-    Returns a list of tool functions that can be used in the LangGraph agent.
-    '''
+    '''Builds tool wrappers for the MCP client session.'''
     tools = []
 
     @tool
@@ -47,7 +45,21 @@ def build_tool_wrappers():
         - Using grpcurl for testing or exploration
         - Service operations like InstanceService, VNetService, MachineImageService, etc.
         """
-        result = await client_session.call_tool("document_qa", {"question": question})
+        # More sophisticated trigger detection
+        reranking_indicators = [
+            "detailed", "comprehensive", "thorough", "precise", "exactly", "best",
+            "explain in detail", "step-by-step", "how exactly", "elaborate",
+            "complete guide", "full explanation", "in-depth"
+        ]
+        
+        use_reranking = any(indicator in question.lower() for indicator in reranking_indicators)
+        print(f"mcp_client: Using reranking: {use_reranking} for question: {question}")
+        # Always use original question
+        result = await client_session.call_tool("document_qa", {
+            "question": question,
+            "search_method": "hybrid",
+            "use_reranking": use_reranking
+        })
         return result.content[0].text
 
     tools.extend([city_weather, list_idc_pools, idc_grpc_api])
