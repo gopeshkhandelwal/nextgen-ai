@@ -46,7 +46,7 @@ def read_document(file_path):
 def build_and_save_index(doc_path, index_dir, embed_model):
     """Build FAISS index from document and save to disk."""
     content = read_document(doc_path)
-    splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
     docs = [Document(page_content=chunk) for chunk in splitter.split_text(content)]
     embedding_model = HuggingFaceEmbeddings(model_name=embed_model)
 
