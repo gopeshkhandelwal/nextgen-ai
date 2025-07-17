@@ -25,7 +25,7 @@ build-vectorstore:
 	. .venv/bin/activate && python common_utils/build_vectorstore.py
 
 # === Run both MCP Client and Server ===
-run-mcp:
+start-nextgen-suite:
 	@echo "🚀 Starting MCP Client + Server..."
 	. .venv/bin/activate && PYTHONPATH=. python mcp_client/client.py mcp_server/server.py
 
