@@ -31,62 +31,68 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
 
 ## Quickstart
 
-1. **Clone the repo and set up a virtual environment**
+1. **Clone the repository**
     ```sh
     git clone <repo-url>
     cd nextgen-ai
-    python3 -m venv .venv
-    source .venv/bin/activate
     ```
 
-2. **Install dependencies**
+2. **Set up environment and install dependencies**
     ```sh
     make install
     ```
 
-3. **Install & Setup PostgreSQL**
-    Install PostgreSQL on your system.
-    For Ubuntu/Debian:
+3. **Configure environment variables**
+    - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).
+    - Ensure your `.env` file contains the required database configuration:
+    ```properties
+    DB_NAME=your_db_name
+    DB_USER=your_db_user
+    DB_PASS=your_db_password
+    DB_HOST=localhost
+    DB_PORT=5432
+    ```
+
+4. **Install & Setup PostgreSQL**
     ```sh
-    sudo apt-get update
-    sudo apt-get install -y postgresql postgresql-contrib
+    make setup-postgres
     ```
     
-    Create Database objects:
-    ```sh
-    # Use the SQL scripts in common_utils/database/
-    psql -U postgres -d your_database -f common_utils/database/schema.sql
-    ```
+    This automated setup will:
+    - Install PostgreSQL server and client tools
+    - Start and enable the PostgreSQL service
+    - Create the database and user from your `.env` configuration
+    - Set up proper permissions and privileges
+    - Configure authentication for password-based access
+    - Create the required database tables (`conversation_history`)
 
-4. **Configure environment**
-    - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).
-    - Set `Database Configuration`.
-    - Set `RAG_EMBED_MODEL` to a local model path (e.g., `./resources/models/minilm`) after downloading.
-
-5. **Download and prepare models (for local LLMs)**
+5. **Download embedding models**
     ```sh
-    # Download MiniLM embedding model (recommended for RAG)
+    # Download MiniLM embedding model (required for RAG)
     make download-model-minilm
     
     # Optional: Download LLaMA 2 model for local inference
     make download-model-llama-2-7b-chat-hf
     ```
 
-6. **Build the vectorstore for RAG/document QA**
-    - Place your docs in `docs/` and set `RAG_DOC_PATH` in `.env`.
-    - Then run:
-      ```sh
-      make build-vectorstore
-      ```
+6. **Build the vectorstore for document Q&A**
+    ```sh
+    # Place your docs in docs/ and set RAG_DOC_PATH in .env
+    make build-vectorstore
+    ```
 
 7. **Start the application**
     ```sh
     make start-nextgen-suite
     ```
 
-8. **Interact**
-    - Enter natural language queries (e.g., "List all IDC pools", "What is the weather in Dallas?", "Give me a detailed explanation of IDC gRPC APIs").
-    - The agent will select and call the appropriate tool, returning the result with source attribution.
+8. **Interact with the system**
+    Enter natural language queries such as:
+    - "List all IDC pools"
+    - "What is the weather in Dallas?"
+    - "Give me a detailed explanation of IDC gRPC APIs"
+    
+    The agent will automatically select and call the appropriate tools, returning results with source attribution.
 
 ## Advanced RAG Features
 
@@ -158,6 +164,10 @@ See `.env.example` for all required and optional variables, including:
 ```sh
 # Environment setup
 make install                    # Set up virtual environment and install dependencies
+make install-postgres-deps      # Install PostgreSQL Python dependencies
+
+# Database setup
+make setup-postgres             # Complete PostgreSQL installation and configuration
 
 # Model management
 make download-model-minilm      # Download MiniLM embedding model for RAG
@@ -206,6 +216,32 @@ make start-nextgen-suite
 # 3. Detailed request: "Give me a comprehensive guide to IDC compute pools"
 ```
 
+## Complete Setup Example
+
+For a complete setup from scratch:
+
+```sh
+# Clone and setup
+git clone <repo-url>
+cd nextgen-ai
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env file with your actual values:
+# - Set OpenAI API key, Hugging Face token, IDC tokens
+# - Configure database settings (DB_NAME, DB_USER, DB_PASS, etc.)
+# - Set RAG and other configuration parameters
+
+# Install everything
+make install
+make setup-postgres
+make download-model-minilm
+make build-vectorstore
+
+# Start the application
+make start-nextgen-suite
+```
+
 ## Troubleshooting
 
 ### **Common Issues**
@@ -231,18 +267,62 @@ make start-nextgen-suite
 - **Memory issues**: Reduce `RAG_CACHE_SIZE` or use smaller embedding models
 - **Reranking errors**: Ensure `sentence-transformers` is installed: `pip install sentence-transformers`
 
+### **PostgreSQL Issues**
+- **Peer authentication failed**: If you get "FATAL: Peer authentication failed for user", run:
+  ```sh
+  make setup-postgres  # This will reconfigure authentication
+  ```
+  Or manually connect using:
+  ```sh
+  psql -U demo_user -d demo_db -h localhost  # Forces TCP connection with password auth
+  ```
+- **Connection refused**: Ensure PostgreSQL is running: `sudo systemctl status postgresql`
+- **Database does not exist**: Re-run `make setup-postgres` to recreate the database
+
 ## PostgreSQL Setup for Long-Term Memory
 
-This project uses PostgreSQL to persist all conversation history for long-term memory.  
-To enable this feature:
+This project uses PostgreSQL to persist all conversation history for long-term memory.
+
+### **Automated Setup (Recommended)**
+The simplest way to set up PostgreSQL is using the provided Makefile target:
+
+```sh
+# One-command PostgreSQL setup
+make setup-postgres
+```
+
+This automated setup will:
+- Install PostgreSQL server and client tools
+- Start and enable PostgreSQL service
+- Create database and user from your `.env` configuration
+- Set proper permissions and privileges
+- Configure password-based authentication
+- Create all required database tables automatically
+- Handle error cases (existing database/user)
+
+### **Manual Setup (Alternative)**
+If you prefer manual setup:
 
 1. **Install PostgreSQL** on your system.
-2. **Create a database and user** (e.g., `chatdb` and `chatuser`).
-3. **Create the `conversation_history` table** using the schema provided in `common_utils/database/`.
+2. **Create a database and user** (e.g., `demo_db` and `demo_user`).
+3. **Create the required tables** using the schema in `common_utils/database/conversation_history.sql`:
+   ```sh
+   psql -U demo_user -d demo_db -f common_utils/database/conversation_history.sql
+   ```
 4. **Set your database credentials** in the `.env` file.
 5. **Restart the application** to enable persistent conversation memory.
 
-All user and assistant messages will now be stored in PostgreSQL, enabling robust long-term memory and analytics.
+### **Configuration**
+Ensure your `.env` file contains the database configuration:
+```properties
+DB_NAME=demo_db
+DB_USER=demo_user
+DB_PASS=DiwaliPwd123$
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+All user and assistant messages will be stored in PostgreSQL, enabling robust long-term memory and analytics.
 
 ## System Architecture Details
 
