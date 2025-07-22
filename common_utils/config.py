@@ -14,14 +14,33 @@ logger = logging.getLogger(__name__)
 def get_llm(tool_mode=False):
     """
     Initialize and return an LLM instance.
-    Supports both OpenAI and remote vLLM (OpenAI-compatible API).
+    Supports OpenAI, remote vLLM (OpenAI-compatible API), and local Gaudi2 LLM.
     """
+    # Check for local LLM first
+    use_local_llm = os.getenv("USE_LOCAL_LLM", "false").lower() == "true"
+    local_llm_type = os.getenv("LOCAL_LLM_TYPE", "")
+    
+    if use_local_llm and local_llm_type == "gaudi2":
+        logger.info("✅ Using local Gaudi2 LLM")
+        try:
+            # Import Gaudi2 LLM wrapper
+            from gaudi2_langchain_wrapper import Gaudi2ChatWrapper
+            llm = Gaudi2ChatWrapper()
+            return llm, False  # Not OpenAI
+        except ImportError as e:
+            logger.error(f"❌ Failed to import Gaudi2 LLM: {e}")
+            logger.info("Falling back to OpenAI/vLLM...")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Gaudi2 LLM: {e}")
+            logger.info("Falling back to OpenAI/vLLM...")
+    
+    # Fall back to original OpenAI/vLLM logic
     openai_model = os.getenv("OPENAI_MODEL", "")
     vllm_model = os.getenv("VLLM_MODEL", "")
     llm_model = openai_model or vllm_model
 
     if not llm_model:
-        raise EnvironmentError("Neither OPENAI_MODEL nor VLLM_MODEL is configured.")
+        raise EnvironmentError("No LLM configuration found. Set OPENAI_MODEL, VLLM_MODEL, or USE_LOCAL_LLM=true with LOCAL_LLM_TYPE=gaudi2.")
 
     # Determine if OpenAI or vLLM
     is_openai = "gpt" in llm_model.lower() or "openai" in llm_model.lower()
@@ -58,6 +77,6 @@ def get_llm(tool_mode=False):
             verbose=True,
         )
     else:
-        raise EnvironmentError("No valid LLM configuration found.")
+        raise EnvironmentError("No valid LLM configuration found. Check OPENAI_MODEL, VLLM_MODEL, or local LLM settings.")
 
     return llm, is_openai

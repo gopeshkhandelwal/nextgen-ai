@@ -123,6 +123,22 @@ def extract_output(state: AgentState) -> AgentState:
         "messages": state.get("messages", []) + [AIMessage(content="⚠️ No response")]
     }
 
+def should_continue(state: AgentState) -> str:
+    """
+    Determine the next node based on whether the LLM wants to use tools.
+    """
+    messages = state.get("messages", [])
+    if not messages:
+        return "extract_output"
+    
+    last_message = messages[-1]
+    
+    # Check if the last message has tool calls
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        return "tools"
+    else:
+        return "extract_output"
+
 def build_graph():
     """
     Builds and compiles the LangGraph agent workflow.
@@ -131,7 +147,17 @@ def build_graph():
     builder.add_node("router", router)
     builder.add_node("tools", ToolNode(tools))
     builder.add_node("extract_output", extract_output)
-    builder.add_edge("router", "tools")
+    
+    # Add conditional routing from router
+    builder.add_conditional_edges(
+        "router",
+        should_continue,
+        {
+            "tools": "tools",
+            "extract_output": "extract_output"
+        }
+    )
+    
     builder.add_edge("tools", "extract_output")
     builder.add_edge("extract_output", END)
     builder.set_entry_point("router")

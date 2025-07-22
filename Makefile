@@ -2,7 +2,7 @@
 # Makefile for managing environment setup, model downloads, and MCP operations
 # ============================================================================
 
-.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag
+.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag build-gaudi2-agent run-gaudi2-agent install-gaudi2-deps setup-gaudi2-env download-gaudi2-model start-nextgen-suite help-gaudi2 test-gaudi2
 
 # === Set up Python virtual environment and install dependencies ===
 install:
@@ -14,6 +14,59 @@ install:
 install-postgres-deps:
 	@echo "📦 Installing PostgreSQL Python dependencies..."
 	. .venv/bin/activate && pip install psycopg2-binary sqlalchemy
+
+# === Install Gaudi2-specific dependencies ===
+install-gaudi2-deps:
+	@echo "🔥 Installing Gaudi2 (Habana) dependencies..."
+	@echo "Checking for Gaudi2 hardware..."
+	@if command -v hl-smi >/dev/null 2>&1; then \
+		echo "✅ Gaudi2 hardware detected!"; \
+		hl-smi; \
+	else \
+		echo "❌ Gaudi2 hardware not detected. Install Habana drivers first."; \
+		echo "Visit: https://docs.habana.ai/en/latest/Installation_Guide/index.html"; \
+		exit 1; \
+	fi
+	@echo "Installing Habana dependencies..."
+	. .venv/bin/activate && pip install -r requirements-gaudi2.txt
+	@echo "✅ Gaudi2 dependencies installed successfully!"
+
+# === Setup complete Gaudi2 environment ===
+setup-gaudi2-env: install install-gaudi2-deps
+	@echo "🚀 Setting up complete Gaudi2 environment..."
+	@echo "Updating .env for Gaudi2 configuration..."
+	@if [ -f .env ]; then \
+		sed -i 's/USE_LOCAL_LLM=false/USE_LOCAL_LLM=true/' .env; \
+		sed -i 's/LOCAL_LLM_TYPE=.*/LOCAL_LLM_TYPE=gaudi2/' .env; \
+		echo "✅ .env updated for Gaudi2"; \
+	else \
+		echo "❌ .env file not found. Please create one first."; \
+		exit 1; \
+	fi
+	@echo "✅ Gaudi2 environment setup complete!"
+	@echo "Run 'make download-gaudi2-model' to download the Llama model"
+	@echo "Then run 'make start-nextgen-suite' to start with Gaudi2 LLM"
+
+# === Download Llama model for Gaudi2 ===
+download-gaudi2-model:
+	@echo "⬇️  Downloading Llama-2-7b-chat-hf for Gaudi2..."
+	@echo "Loading configuration from .env file..."
+	@if [ ! -f .env ]; then \
+		echo "❌ Error: .env file not found!"; \
+		exit 1; \
+	fi
+	$(eval include .env)
+	$(eval export $(shell sed 's/=.*//' .env))
+	@if [ -z "$(HUGGINGFACE_HUB_TOKEN)" ]; then \
+		echo "❌ Error: HUGGINGFACE_HUB_TOKEN not found in .env file!"; \
+		echo "Please set your Hugging Face token in .env"; \
+		exit 1; \
+	fi
+	@mkdir -p ./models
+	. .venv/bin/activate && python common_utils/download_model.py \
+		--model meta-llama/Llama-2-7b-chat-hf \
+		--output_dir ./models/Llama-2-7b-chat-hf
+	@echo "✅ Llama-2-7b-chat-hf downloaded for Gaudi2!"
 
 # === Download specific MiniLM model ===
 download-model-minilm:
@@ -90,6 +143,11 @@ setup-postgres: install-postgres-deps
 # === Run both MCP Client and Server ===
 start-nextgen-suite:
 	@echo "🚀 Starting MCP Client + Server..."
+	@if [ -f .env ] && grep -q "USE_LOCAL_LLM=true" .env && grep -q "LOCAL_LLM_TYPE=gaudi2" .env; then \
+		echo "🔥 Using Gaudi2 local LLM configuration..."; \
+	else \
+		echo "🌐 Using cloud LLM configuration..."; \
+	fi
 	. .venv/bin/activate && PYTHONPATH=. python mcp_client/client.py mcp_server/server.py
 
 
@@ -98,10 +156,88 @@ test-rag:
 	@echo "🧪 Running RAG test script..."
 	. .venv/bin/activate && python common_utils/rag_test.py
 
+# === Build Gaudi2 Agent Docker image ===
+build-gaudi2-agent:
+	@echo "🤖 Building Gaudi2 Agent Docker image..."
+	@echo "Loading configuration from .env file..."
+	$(eval include .env)
+	$(eval export $(shell sed 's/=.*//' .env))
+	@if [ -z "$(HUGGINGFACE_HUB_TOKEN)" ]; then \
+		echo "❌ Error: HUGGINGFACE_HUB_TOKEN not found in .env file!"; \
+		echo "Please set your Hugging Face token in .env"; \
+		exit 1; \
+	fi
+	docker build \
+		--build-arg HF_TOKEN=$(HUGGINGFACE_HUB_TOKEN) \
+		-t gaudi2-agent-llama2 \
+		-f deployment/docker/gaudi2-agent.Dockerfile .
+	@echo "✅ Gaudi2 Agent Docker image built successfully!"
+
+# === Run Gaudi2 Agent ===
+run-gaudi2-agent:
+	@echo "🚀 Starting Gaudi2 Agent..."
+	@echo "Loading configuration from .env file..."
+	$(eval include .env)
+	$(eval export $(shell sed 's/=.*//' .env))
+	docker run -d \
+		--runtime=habana \
+		-e HABANA_VISIBLE_DEVICES=all \
+		-e OMPI_MCA_btl_vader_single_copy_mechanism=none \
+		--env-file .env \
+		-p 8080:8080 \
+		-v $(CURDIR):/app \
+		--name gaudi2-agent \
+		gaudi2-agent-llama2 \
+		python mcp_client/client.py
+	@echo "✅ Gaudi2 Agent started!"
+	@echo "Agent API: http://localhost:8080"
+	@echo "To access container: docker exec -it gaudi2-agent bash"
+	@echo "To view logs: docker logs gaudi2-agent"
+
 # === Clean up environment and artifacts ===
 clean:
 	@echo "🧹 Cleaning up virtual environment and vectorstore..."
 	rm -rf .venv vectorstore
+
+# === Show Gaudi2 setup help ===
+help-gaudi2:
+	@echo "🔥 Gaudi2 Hardware Setup Guide"
+	@echo "=========================================="
+	@echo ""
+	@echo "Quick Setup (recommended):"
+	@echo "  1. make setup-gaudi2-env    # Install all dependencies and configure"
+	@echo "  2. make download-gaudi2-model # Download Llama model"
+	@echo "  3. make start-nextgen-suite  # Start agent with Gaudi2 LLM"
+	@echo ""
+	@echo "Manual Setup:"
+	@echo "  1. make install             # Create virtual environment"
+	@echo "  2. make install-gaudi2-deps # Install Habana dependencies"
+	@echo "  3. Edit .env: USE_LOCAL_LLM=true, LOCAL_LLM_TYPE=gaudi2"
+	@echo "  4. make download-gaudi2-model # Download model"
+	@echo "  5. make start-nextgen-suite  # Start agent"
+	@echo ""
+	@echo "Check hardware: hl-smi"
+	@echo "Check installation: make test-gaudi2"
+	@echo ""
+
+# === Test Gaudi2 installation ===
+test-gaudi2:
+	@echo "🧪 Testing Gaudi2 installation..."
+	@echo "Checking hardware..."
+	@if command -v hl-smi >/dev/null 2>&1; then \
+		echo "✅ Gaudi2 hardware available:"; \
+		hl-smi | head -20; \
+	else \
+		echo "❌ hl-smi not found"; \
+	fi
+	@echo "Checking Python dependencies..."
+	. .venv/bin/activate && python test_gaudi2_deps.py
+	@echo "Checking model..."
+	@if [ -d "./models/Llama-2-7b-chat-hf" ]; then \
+		echo "✅ Llama model downloaded"; \
+	else \
+		echo "❌ Llama model not found. Run: make download-gaudi2-model"; \
+	fi
 
 # === Clean up PostgreSQL installation ===
 clean-postgres:

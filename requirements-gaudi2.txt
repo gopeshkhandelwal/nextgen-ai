@@ -1,0 +1,20 @@
+# Gaudi2-specific dependencies for Habana hardware
+# Install these when running on real Gaudi2 hardware
+
+# Core Habana dependencies
+optimum[habana]>=1.11.0
+# Note: habana-torch-plugin is typically installed system-wide with Habana drivers
+# Note: habana-torch-dataloader is typically installed system-wide with Habana drivers
+
+# Core ML dependencies (versions compatible with Habana)
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.21.0
+
+# Additional dependencies for Gaudi2 LLM
+datasets>=2.14.0
+tokenizers>=0.15.0
+safetensors>=0.4.0
+
+# Performance optimization
+# intel-extension-for-pytorch  # Comment out if not needed
