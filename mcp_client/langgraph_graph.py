@@ -53,13 +53,27 @@ async def router(state: AgentState) -> AgentState:
     - Uses short-term memory by default.    
     - Automatically retries with long-term memory if LLM response is low-confidence.
     """
-    # System message with balanced prompt (using correct SystemMessage type)
-    system_msg = SystemMessage(content="""You are a helpful assistant that answers questions directly and clearly.
+    # System message optimized for Meta-Llama-3.1-8B-Instruct function calling
+    system_msg = SystemMessage(content="""You are a helpful assistant with access to these tools:
+- city_weather: Get current weather for any city (use when users ask about weather)
+- document_qa: Search documents and answer questions
+- list_idc_pools: Get IDC pool information
+- machine_images: Get machine image information
+- rag_cache_stats: Get RAG cache statistics  
+- rag_clear_cache: Clear RAG cache
 
-When you can answer a question with your knowledge, do so concisely and accurately.
-Only use tools when you need external data like weather, IDC resources, or document searches.
+CRITICAL INSTRUCTIONS:
+1. When users ask about weather in any city, you MUST call the city_weather tool
+2. When users ask about documents or need to search information, use document_qa tool
+3. Always use the appropriate tool instead of saying you don't have access to data
+4. Be direct and helpful in your responses
 
-Answer the user's question directly.""")
+Examples:
+- "weather in dallas" → call city_weather with location="dallas"
+- "what's in the documentation" → call document_qa tool
+- "list IDC pools" → call list_idc_pools tool
+
+You have real-time access to data through these tools. Use them!""")
     
     # Get messages and filter out empty assistant messages
     messages = state.get("messages", [])

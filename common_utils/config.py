@@ -23,15 +23,15 @@ class OptimumHabanaLLM:
         self.bound_tools = []
 
     def generate(self, prompt, **kwargs):
-        # Limit prompt length for stability
-        max_prompt_length = 300  # Shorter prompts for faster processing
-        if len(prompt) > max_prompt_length:
-            prompt = prompt[:max_prompt_length] + "..."
+        # Remove the aggressive truncation - let the full prompt through
+        # max_prompt_length = 300  # Remove this line
+        # if len(prompt) > max_prompt_length:  # Remove this block
+        #     prompt = prompt[:max_prompt_length] + "..."
             
         payload = {
             "model": self.model,
-            "prompt": prompt,
-            "max_tokens": min(kwargs.get("max_tokens", self.max_tokens), 256),  # Smaller responses
+            "prompt": prompt,  # Send full prompt
+            "max_tokens": min(kwargs.get("max_tokens", self.max_tokens), 256),
             "temperature": kwargs.get("temperature", self.temperature),
         }
         
@@ -50,7 +50,7 @@ class OptimumHabanaLLM:
                 f"{self.api_base}/generate", 
                 json=payload, 
                 headers=headers,
-                timeout=60  # Increase to 60 seconds - same as your curl command
+                timeout=180
             )
             
             elapsed = time.time() - start_time
@@ -69,8 +69,8 @@ class OptimumHabanaLLM:
             return response_json.get("response", response_json.get("text", ""))
             
         except requests.exceptions.Timeout:
-            print("DEBUG: Request timed out after 10s")
-            return "[Connection timeout - check server status]"
+            print("DEBUG: Request timed out after 180s")
+            return "[Connection timeout - server taking longer than 180s]"
         except requests.exceptions.ConnectionError as e:
             print(f"DEBUG: Connection error: {e}")
             return "[Connection failed - server unreachable]"
@@ -90,70 +90,62 @@ class OptimumHabanaLLM:
         return self
 
     def invoke(self, messages, **kwargs):
-        """LangChain-compatible invoke method"""
+        """LangChain-compatible invoke method optimized for Meta-Llama-3.1-8B-Instruct"""
         from langchain_core.messages import AIMessage
         
         print(f"DEBUG: Raw messages received: {messages}")  # Debug line
         
-        # Convert messages to a clean, direct prompt
-        if isinstance(messages, list):
-            user_question = None
+        # Build the complete prompt with system instructions AND user question
+        system_content = ""
+        user_question = ""
+        
+        # Process messages to extract system and user content
+        for msg in messages:
+            print(f"DEBUG: Processing message: {type(msg)}")
             
-            # Process messages in REVERSE order to get the latest user message
-            for msg in reversed(messages):
-                print(f"DEBUG: Processing message: {type(msg)}")  # Debug line
-                
-                # Handle both dictionary and object messages
-                content = None
-                msg_type = None
-                
-                if isinstance(msg, dict):
-                    # Dictionary format (from LangGraph)
-                    content = msg.get('content', '')
-                    msg_type = msg.get('role', '')
-                    print(f"DEBUG: Dict message - type: {msg_type}, content: '{content[:50]}...'")
-                elif hasattr(msg, 'content'):
-                    # Object format (LangChain messages)
-                    content = msg.content
-                    msg_type = getattr(msg, 'type', getattr(msg, '__class__', '').__name__.lower())
-                    print(f"DEBUG: Object message - type: {msg_type}, content: '{content[:50]}...'")
-                
-                if content and content.strip():
-                    content = content.strip()
-                    
-                    if msg_type == 'system':
-                        print(f"DEBUG: Skipping system message")
-                        pass  # Skip system messages
-                    elif msg_type in ['human', 'user'] or msg_type == 'user':
-                        # Found a user message - since we're going in reverse, this is the LATEST one!
-                        user_question = content
-                        print(f"DEBUG: Found LATEST user question: '{user_question}'")
-                        break  # Use the first (latest) user message we find
+            content = None
+            msg_type = None
             
-            # Use the user's question as the direct prompt
-            if user_question:
-                prompt = user_question
-            else:
-                # Fallback: look for any non-system content
-                for msg in reversed(messages):
-                    if isinstance(msg, dict):
-                        content = msg.get('content', '')
-                        role = msg.get('role', '')
-                        if content.strip() and role != 'system':
-                            prompt = content.strip()
-                            break
-                else:
-                    prompt = "Hello"
+            if isinstance(msg, dict):
+                content = msg.get('content', '')
+                msg_type = msg.get('role', '')
+                print(f"DEBUG: Dict message - type: {msg_type}, content: '{content[:50]}...'")
+            elif hasattr(msg, 'content'):
+                content = msg.content
+                msg_type = getattr(msg, 'type', getattr(msg, '__class__', '').__name__.lower())
+                print(f"DEBUG: Object message - type: {msg_type}, content: '{content[:50]}...'")
+            
+            if content and content.strip():
+                content = content.strip()
+                
+                if msg_type == 'system':
+                    system_content = content
+                    print(f"DEBUG: Found system instructions: '{content[:100]}...'")
+                elif msg_type in ['human', 'user'] or msg_type == 'user':
+                    user_question = content
+                    print(f"DEBUG: Found user question: '{user_question}'")
+        
+        # Build complete prompt with system instructions + user question
+        if system_content and user_question:
+            # Format as instruction-following prompt for Llama-3.1
+            prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+{system_content}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+{user_question}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+            print(f"DEBUG: Built complete prompt with system instructions and user question")
+        elif user_question:
+            prompt = user_question
+            print(f"DEBUG: Using user question only (no system instructions)")
         else:
-            prompt = str(messages).strip()
-        
-        # Ensure we have a valid prompt
-        if not prompt or prompt == "":
             prompt = "Hello"
+            print(f"DEBUG: Fallback to default prompt")
         
-        print(f"DEBUG: Final prompt being sent: '{prompt}'")  # Debug line
+        print(f"DEBUG: Final prompt being sent to Meta-Llama-3.1-8B-Instruct: '{prompt[:200]}...'")
         
-        # Generate response
+        # Generate response using Meta-Llama-3.1-8B-Instruct
         response_text = self.generate(prompt, **kwargs)
         
         # Return as AIMessage

@@ -24,6 +24,10 @@ download-model-llama-2-7b-chat-hf:
 	@echo "⬇️  Downloading llama-2-7b-chat-hf embedding model..."
 	. .venv/bin/activate && python common_utils/download_model.py --model meta-llama/Llama-2-7b-chat-hf --output_dir ./resources/models/meta-llama/Llama-2-7b-chat-hf
 
+download-model-llama-3.1-8b-instruct:
+	@echo "⬇️  Downloading Meta-Llama-3.1-8B-Instruct model..."
+	. .venv/bin/activate && python common_utils/download_model.py --model meta-llama/Meta-Llama-3.1-8B-Instruct --output_dir ./resources/models/meta-llama/Meta-Llama-3.1-8B-Instruct
+
 # === Build FAISS vectorstore from documents ===
 build-vectorstore:
 	@echo "🔨 Building FAISS vector store from RAG documents..."
