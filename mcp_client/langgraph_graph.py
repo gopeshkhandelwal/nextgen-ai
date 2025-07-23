@@ -53,18 +53,39 @@ async def router(state: AgentState) -> AgentState:
     - Uses short-term memory by default.    
     - Automatically retries with long-term memory if LLM response is low-confidence.
     """
-    system_message = SystemMessage(
-        content="""You are a helpful assistant. Use the tools when needed. 
-        
-        IMPORTANT: When calling tools, preserve the user's EXACT question including all qualifiers 
-        like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
-        These words are important for determining the quality and depth of the response.
-        
-        Do not simplify or paraphrase the user's question when calling tools."""
-    )
-    context_messages = [system_message] + state.get("messages", [])
+    # System message optimized for Meta-Llama-3.1-8B-Instruct function calling
+    system_msg = SystemMessage(content="""You are a helpful assistant with access to these tools:
+- city_weather: Get current weather for any city (use when users ask about weather)
+- document_qa: Search documents and answer questions
+- list_idc_pools: Get IDC pool information
+- machine_images: Get machine image information
+- rag_cache_stats: Get RAG cache statistics  
+- rag_clear_cache: Clear RAG cache
+
+CRITICAL INSTRUCTIONS:
+1. When users ask about weather in any city, you MUST call the city_weather tool
+2. When users ask about documents or need to search information, use document_qa tool
+3. Always use the appropriate tool instead of saying you don't have access to data
+4. Be direct and helpful in your responses
+
+Examples:
+- "weather in dallas" → call city_weather with location="dallas"
+- "what's in the documentation" → call document_qa tool
+- "list IDC pools" → call list_idc_pools tool
+
+You have real-time access to data through these tools. Use them!""")
     
-    # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+    # Get messages and filter out empty assistant messages
+    messages = state.get("messages", [])
+    filtered_messages = []
+    for msg in messages:
+        # Skip empty assistant messages that cause server errors
+        if hasattr(msg, 'content') and msg.content and msg.content.strip():
+            filtered_messages.append(msg)
+    
+    context_messages = [system_msg] + filtered_messages
+    
+    # Ensure we have a valid prompt history to LLM
     context_messages = sanitize_message_history(context_messages)
     
     logger.info("🔄 Router invoked with %d messages using short-term memory.", len(context_messages))
@@ -86,9 +107,9 @@ async def router(state: AgentState) -> AgentState:
         if user_id and session_id:
             ltm_history = get_last_n_messages(user_id, session_id, int(os.getenv("LONG_TERM_MEMORY")))
             ltm_history = sanitize_message_history(ltm_history)
-            context_messages = [system_message] + ltm_history
+            context_messages = [system_msg] + ltm_history
   
-            # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+            # Ensure we have a valid prompt history to LLM
             context_messages = sanitize_message_history(context_messages)
             logger.info("🔄 Router invoked with %d messages using long-term memory.", len(context_messages))
             json_ready = [to_openai_dict(m) for m in context_messages]
