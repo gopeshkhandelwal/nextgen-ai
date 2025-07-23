@@ -10,11 +10,10 @@ RUN apt-get update && \
 # Configure huggingface-cli
 RUN huggingface-cli login --token $HF_TOKEN
 
-# Download model to /model-cache
+# Download Hermes-2-Pro-Llama-3-8B (excellent for function calling)
 RUN python3 -c "from huggingface_hub import snapshot_download; \
-    snapshot_download(repo_id='meta-llama/Llama-2-7b-chat-hf', \
-    local_dir='/model-cache/Llama-2-7b-chat-hf', \
-    token='$HF_TOKEN', \
+    snapshot_download(repo_id='NousResearch/Hermes-2-Pro-Llama-3-8B', \
+    local_dir='/model-cache/Hermes-2-Pro-Llama-3-8B', \
     local_dir_use_symlinks=False)"
 
 # === Stage 2: Optimum Habana Runtime ===
@@ -30,15 +29,16 @@ RUN apt-get update && \
 # Install Python dependencies
 RUN pip install --upgrade pip && \
     pip install optimum[habana]>=1.12.0 && \
-    pip install transformers>=4.40.0 && \
+    pip install transformers>=4.43.0 && \
     pip install accelerate>=0.21.0 && \
     pip install flask>=2.0.0 && \
-    pip install torch>=2.1.0
+    pip install torch>=2.1.0 && \
+    pip install tokenizers>=0.19.0
 
-# Copy the downloaded model
-COPY --from=model-downloader /model-cache/Llama-2-7b-chat-hf /app/models/Llama-2-7b-chat-hf
+# Copy the downloaded Hermes-2-Pro model
+COPY --from=model-downloader /model-cache/Hermes-2-Pro-Llama-3-8B /app/models/Hermes-2-Pro-Llama-3-8B
 
-# Copy Optimum Habana server code
+# Copy server code
 COPY optimum_habana_server.py /app/
 COPY optimum_habana_client.py /app/
 

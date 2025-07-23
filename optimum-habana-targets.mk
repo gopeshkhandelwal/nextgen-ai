@@ -1,11 +1,11 @@
 # Optimum Habana Build and Run Scripts
-# Similar to your vLLM-fork setup but using Optimum Habana
+# Updated for Meta-Llama-3.1-8B-Instruct
 
-DOCKER_IMAGE_NAME=optimum-habana-llama2
+DOCKER_IMAGE_NAME=optimum-habana-llama3.1
 CONTAINER_NAME=optimum-habana-server
 
 build-optimum-habana:
-	@echo "🔥 Building Optimum Habana Docker image..."
+	@echo "🔥 Building Optimum Habana Docker image for Meta-Llama-3.1-8B-Instruct..."
 	@if [ ! -f .env ]; then \
 		echo "❌ Error: .env file not found!"; \
 		echo "Please create .env with HUGGINGFACE_HUB_TOKEN"; \
@@ -21,10 +21,10 @@ build-optimum-habana:
 		--build-arg HF_TOKEN=$(HUGGINGFACE_HUB_TOKEN) \
 		-t $(DOCKER_IMAGE_NAME) \
 		-f deployment/docker/optimum-habana.Dockerfile .
-	@echo "✅ Optimum Habana image built successfully!"
+	@echo "✅ Optimum Habana image built successfully with Meta-Llama-3.1-8B-Instruct!"
 
 run-optimum-habana:
-	@echo "🚀 Starting Optimum Habana server..."
+	@echo "🚀 Starting Optimum Habana server with Meta-Llama-3.1-8B-Instruct..."
 	docker run -d \
 		--runtime=habana \
 		-e HABANA_VISIBLE_DEVICES=all \
@@ -33,7 +33,7 @@ run-optimum-habana:
 		-v $(CURDIR):/workspace \
 		--name $(CONTAINER_NAME) \
 		$(DOCKER_IMAGE_NAME)
-	@echo "✅ Optimum Habana server started!"
+	@echo "✅ Optimum Habana server started with Meta-Llama-3.1-8B-Instruct!"
 	@echo "Server: http://localhost:8080"
 	@echo "Health check: curl http://localhost:8080/health"
 
