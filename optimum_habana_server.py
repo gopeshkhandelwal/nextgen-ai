@@ -8,6 +8,7 @@ import os
 import logging
 import json
 import gc
+import re
 from flask import Flask, request, jsonify
 import torch
 import time
@@ -261,6 +262,128 @@ def health_check():
             "status": "error",
             "error": str(e)
         }), 500
+
+@app.route('/v1/chat/completions', methods=['POST'])
+def chat_completions():
+    """OpenAI-compatible chat completions endpoint for function calling"""
+    try:
+        data = request.json
+        messages = data.get('messages', [])
+        max_tokens = min(data.get('max_tokens', 128), 128)  
+        temperature = data.get('temperature', 0.3)
+        tools = data.get('tools', [])
+        tool_choice = data.get('tool_choice', 'none')
+        
+        if not messages:
+            return jsonify({"error": "Messages are required"}), 400
+        
+        # Extract the last user message for generation
+        last_message = messages[-1] if messages else {}
+        user_content = last_message.get('content', '')
+        
+        if not user_content:
+            return jsonify({"error": "Empty user message"}), 400
+        
+        logger.info(f"📝 Chat completion request: '{user_content[:100]}...' (tools: {len(tools)})")
+        
+        # For function calling, we need to check if the user wants to call a tool
+        # Hermes-2-Pro supports function calling with proper prompting
+        if tools and tool_choice != 'none':
+            # Create a comprehensive function calling prompt
+            tools_json = []
+            for tool in tools:
+                tools_json.append({
+                    "name": tool['function']['name'],
+                    "description": tool['function']['description'],
+                    "parameters": tool['function'].get('parameters', {})
+                })
+            
+            function_prompt = f"""<|im_start|>system
+You are a helpful assistant with access to function calls. When the user's request can be fulfilled by calling a function, you must respond with a function call.
+
+Available functions:
+{json.dumps(tools_json, indent=2)}
+
+To call a function, respond with ONLY this JSON format (no other text):
+{{"function_call": {{"name": "function_name", "arguments": {{"param": "value"}}}}}}
+
+Example:
+User: "Get the weather in Paris"
+Assistant: {{"function_call": {{"name": "get_weather", "arguments": {{"city": "Paris"}}}}}}
+
+If the user's request matches one of the available functions, call it. Otherwise, respond normally.<|im_end|>
+<|im_start|>user
+{user_content}<|im_end|>
+<|im_start|>assistant
+"""
+            
+            response_text = llm_model.generate(
+                prompt=function_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+            
+            logger.info(f"🔧 Function calling response: {response_text}")
+            
+            # Check if response contains a function call
+            if "function_call" in response_text:
+                try:
+                    # Try to extract just the JSON part
+                    import re
+                    json_match = re.search(r'\{.*"function_call".*\}', response_text, re.DOTALL)
+                    if json_match:
+                        func_call_json = json_match.group(0)
+                        func_call = json.loads(func_call_json)
+                        if "function_call" in func_call:
+                            logger.info(f"✅ Function call detected: {func_call}")
+                            # Return OpenAI-style function call response
+                            return jsonify({
+                                "id": f"chatcmpl-{int(time.time())}",
+                                "object": "chat.completion",
+                                "created": int(time.time()),
+                                "model": "NousResearch/Hermes-2-Pro-Llama-3-8B",
+                                "choices": [{
+                                    "index": 0,
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": None,
+                                        "function_call": func_call["function_call"]
+                                    },
+                                    "finish_reason": "function_call"
+                                }],
+                                "usage": {"prompt_tokens": len(user_content.split()), "completion_tokens": len(response_text.split()), "total_tokens": len(user_content.split()) + len(response_text.split())}
+                            })
+                except (json.JSONDecodeError, AttributeError) as e:
+                    logger.warning(f"Failed to parse function call: {e}")
+                    pass
+        
+        # Regular text generation
+        response_text = llm_model.generate(
+            prompt=user_content,
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
+        
+        # Return OpenAI-style response
+        return jsonify({
+            "id": f"chatcmpl-{int(time.time())}",
+            "object": "chat.completion", 
+            "created": int(time.time()),
+            "model": "NousResearch/Hermes-2-Pro-Llama-3-8B",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": response_text
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {"prompt_tokens": len(user_content.split()), "completion_tokens": len(response_text.split()), "total_tokens": len(user_content.split()) + len(response_text.split())}
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Chat completion failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/generate', methods=['POST'])
 def generate():

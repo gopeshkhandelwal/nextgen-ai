@@ -204,8 +204,8 @@ def get_llm(tool_mode=False):
         llm = ChatOpenAI(
             model=vllm_model,
             temperature=0.2,
-            openai_api_key="not-needed",
-            openai_api_base=vllm_api_base,
+            api_key="not-needed",
+            base_url=vllm_api_base,
             request_timeout=60,
             model_kwargs=model_kwargs,
             verbose=True,
@@ -213,14 +213,24 @@ def get_llm(tool_mode=False):
         return llm, False
     elif provider == "optimum_habana":
         optimum_api_base = os.getenv("OPTIMUM_HABANA_API_BASE")
-        if not optimum_model or not optimum_api_base:
-            raise EnvironmentError("OPTIMUM_HABANA_MODEL or OPTIMUM_HABANA_API_BASE is not configured.")
+        optimum_model = os.getenv("OPTIMUM_HABANA_MODEL", "NousResearch/Hermes-2-Pro-Llama-3-8B")
+        if not optimum_api_base:
+            raise EnvironmentError("OPTIMUM_HABANA_API_BASE is not configured.")
         logger.info(f"✅ Using Optimum Habana model: {optimum_model} at {optimum_api_base}")
-        llm = OptimumHabanaLLM(
-            api_base=optimum_api_base,
+        
+        # Use ChatOpenAI to connect to Optimum Habana server in OpenAI format
+        model_kwargs = {}
+        if tool_mode:
+            model_kwargs["tool_choice"] = "auto"
+            
+        llm = ChatOpenAI(
             model=optimum_model,
-            max_tokens=os.getenv("OPTIMUM_HABANA_MAX_TOKENS", 4096),
-            temperature=os.getenv("OPTIMUM_HABANA_TEMPERATURE", 0.7),
+            temperature=0.3,
+            api_key="not-needed",
+            base_url=optimum_api_base,
+            request_timeout=180,
+            model_kwargs=model_kwargs,
+            verbose=True,
         )
         return llm, False
     else:
