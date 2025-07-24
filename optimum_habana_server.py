@@ -12,24 +12,15 @@ from flask import Flask, request, jsonify
 import torch
 import time
 
-# Import with fallback strategy
-logger = logging.getLogger(__name__)
+# Optimum Habana imports
+from optimum.habana import GaudiConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
+# Import Habana optimizations
+import habana_frameworks.torch.core as htcore
+import habana_frameworks.torch.hpu as hthpu
 
-try:
-    # Try Optimum Habana first
-    from optimum.habana.transformers import GaudiConfig, AutoModelForCausalLM as GaudiAutoModelForCausalLM
-    from transformers import AutoTokenizer
-    # Import Habana optimizations
-    import habana_frameworks.torch.core as htcore
-    import habana_frameworks.torch.hpu as hthpu
-    OPTIMUM_HABANA_AVAILABLE = True
-    logger.info("✅ Using Optimum Habana with Gaudi optimizations")
-except ImportError as e:
-    logger.warning(f"⚠️  Optimum Habana import failed: {e}")
-    # Fallback to standard transformers
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    OPTIMUM_HABANA_AVAILABLE = False
-    logger.info("📦 Using standard Transformers (fallback)")
+logger = logging.getLogger(__name__)
+logger.info("✅ Using Optimum Habana with Gaudi optimizations")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,33 +40,19 @@ class OptimumHabanaLLM:
         self._load_model()
     
     def _get_optimal_device(self):
-        """Determine the best available device"""
-        if hasattr(torch, 'hpu') and torch.hpu.is_available():
-            return "hpu"
-        elif torch.cuda.is_available():
-            return "cuda"
-        else:
-            return "cpu"
+        """HPU device only"""
+        return "hpu"
     
     def _optimize_hpu_memory(self):
         """Apply HPU-specific memory optimizations"""
-        try:
-            if self.device == "hpu":
-                # Set HPU memory management
-                os.environ['PT_HPU_LAZY_MODE'] = '1'
-                os.environ['PT_HPU_ENABLE_LAZY_COLLECTIVES'] = '0'
-                os.environ['PT_HPU_MAX_COMPOUND_OP_SIZE'] = '1'
-                
-                # Enable memory optimizations
-                htcore.hpu_set_env()
-                
-                # Clear HPU cache
-                if hasattr(hthpu, 'empty_cache'):
-                    hthpu.empty_cache()
-                
-                logger.info("🔧 Applied HPU memory optimizations")
-        except Exception as e:
-            logger.warning(f"⚠️  Could not apply HPU optimizations: {e}")
+        # Use the recommended hpu_inference_set_env for inference workloads
+        htcore.hpu_inference_set_env()
+        
+        # Set additional HPU memory management
+        os.environ['PT_HPU_ENABLE_LAZY_COLLECTIVES'] = '0'
+        os.environ['PT_HPU_MAX_COMPOUND_OP_SIZE'] = '1'
+        
+        logger.info("🔧 Applied HPU inference optimizations")
     
     def _load_model(self):
         """Load OpenChat-3.5-Function-Call with optimizations"""
@@ -96,49 +73,25 @@ class OptimumHabanaLLM:
             
             logger.info(f"🤖 Loading OpenChat-3.5-Function-Call model")
             
-            if self.device == "hpu" and OPTIMUM_HABANA_AVAILABLE:
-                try:
-                    self.model = GaudiAutoModelForCausalLM.from_pretrained(
-                        self.model_path,
-                        torch_dtype=torch.bfloat16,
-                        trust_remote_code=True,
-                        device_map=None,
-                        low_cpu_mem_usage=True,
-                        use_safetensors=True,
-                        use_cache=False,
-                        output_attentions=False,
-                        output_hidden_states=False,
-                    )
-                    self.model = self.model.to('hpu')
-                    logger.info("✅ Loaded with Optimum Habana optimizations")
-                    
-                except Exception as e:
-                    logger.warning(f"⚠️  Optimum Habana loading failed: {e}")
-                    raise e
-                    
-            elif self.device == "cuda":
-                from transformers import AutoModelForCausalLM
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_path,
-                    torch_dtype=torch.float16,
-                    device_map="auto",
-                    trust_remote_code=True,
-                    low_cpu_mem_usage=True,
-                )
-            else:
-                # CPU fallback
-                from transformers import AutoModelForCausalLM
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_path,
-                    torch_dtype=torch.float32,
-                    trust_remote_code=True,
-                    low_cpu_mem_usage=True,
-                )
+            # Create Gaudi configuration
+            gaudi_config = GaudiConfig()
+            
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_path,
+                torch_dtype=torch.bfloat16,
+                trust_remote_code=True,
+                device_map=None,
+                low_cpu_mem_usage=True,
+                use_safetensors=True,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+            )
+            self.model = self.model.to('hpu')
+            logger.info("✅ Loaded with Optimum Habana optimizations")
             
             # Force garbage collection
             gc.collect()
-            if self.device == "hpu" and hasattr(hthpu, 'empty_cache'):
-                hthpu.empty_cache()
             
             logger.info(f"✅ OpenChat-3.5-Function-Call loaded successfully on {self.device}")
             
@@ -149,7 +102,7 @@ class OptimumHabanaLLM:
     def generate(self, prompt, max_tokens=256, temperature=0.3, top_p=0.9):
         """Generate with Hermes-2-Pro with timeout and memory management"""
         try:
-            logger.info(f"🔄 Starting generation with Hermes-2-Pro: '{prompt[:50]}...'")
+            logger.info(f"🔄 Starting generation with Hermes-2-Pro: '{prompt}...'")
             start_time = time.time()
             
             if not isinstance(prompt, str) or not prompt.strip():
@@ -171,11 +124,8 @@ class OptimumHabanaLLM:
             input_length = inputs['input_ids'].shape[1]
             logger.info(f"🔢 Input tokens: {input_length}")
             
-            # Move to device
-            if self.device == "hpu":
-                inputs = {k: v.to("hpu") for k, v in inputs.items()}
-            elif self.device == "cuda":
-                inputs = {k: v.to("cuda") for k, v in inputs.items()}
+            # Move to HPU
+            inputs = {k: v.to("hpu") for k, v in inputs.items()}
             
             # Generate with aggressive memory and time limits
             logger.info("🚀 Starting model generation...")
@@ -206,8 +156,6 @@ class OptimumHabanaLLM:
             del outputs
             del inputs
             gc.collect()
-            if self.device == "hpu" and hasattr(hthpu, 'empty_cache'):
-                hthpu.empty_cache()
             
             logger.info(f"✅ Hermes-2-Pro response ({len(response)} chars): '{response[:100]}...'")
             return response
@@ -216,8 +164,6 @@ class OptimumHabanaLLM:
             logger.error(f"❌ Hermes-2-Pro generation failed after {time.time() - start_time:.2f}s: {e}")
             # Force cleanup on error
             gc.collect()
-            if self.device == "hpu" and hasattr(hthpu, 'empty_cache'):
-                hthpu.empty_cache()
             return f"Error: Generation failed - {str(e)}"
     
     def _format_hermes_prompt(self, prompt):

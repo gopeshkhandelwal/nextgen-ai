@@ -2,7 +2,7 @@
 # Makefile for managing environment setup, model downloads, and MCP operations
 # ============================================================================
 
-.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag build-optimum-habana run-optimum-habana stop-optimum-habana logs-optimum-habana test-optimum-habana shell-optimum-habana restart-optimum-habana
+.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag build-optimum-habana run-optimum-habana stop-optimum-habana logs-optimum-habana test-optimum-habana test-optimum-habana-client shell-optimum-habana restart-optimum-habana
 
 # === Set up Python virtual environment and install dependencies ===
 install:
