@@ -49,7 +49,16 @@ logs-optimum-habana:
 
 test-optimum-habana:
 	@echo "🧪 Testing Optimum Habana server..."
-	python optimum_habana_client.py test
+	@echo "Health check..."
+	curl -X GET http://localhost:8080/health || echo "❌ Health check failed"
+	@echo "Generation test..."
+	curl -X POST http://localhost:8080/generate \
+		-H "Content-Type: application/json" \
+		-d '{"prompt": "What is the capital of France?", "max_tokens": 50, "temperature": 0.7}' || echo "❌ Generation test failed"
+
+test-optimum-habana-client:
+	@echo "🧪 Testing Optimum Habana server with Python client..."
+	. .venv/bin/activate && python optimum_habana_client.py test
 
 shell-optimum-habana:
 	@echo "🐚 Opening shell in Optimum Habana container..."
