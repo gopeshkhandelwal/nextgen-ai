@@ -25,6 +25,7 @@ def register_tools(mcp):
         Returns:
             str: Description of the weather or an error message.
         """
+        logger.info("Tool called: city_weather")
         logger.info("Fetching weather for city: %s", city)
 
         try:
