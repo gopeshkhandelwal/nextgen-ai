@@ -53,6 +53,7 @@ async def router(state: AgentState) -> AgentState:
     - Uses short-term memory by default.    
     - Automatically retries with long-term memory if LLM response is low-confidence.
     """
+
     system_message = SystemMessage(
         content="""You are a helpful assistant. Use the tools when needed. 
         
@@ -69,7 +70,7 @@ async def router(state: AgentState) -> AgentState:
     )
     context_messages = [system_message] + state.get("messages", [])
     
-    # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+    # Ensure we have a valid prompt history to LLM
     context_messages = sanitize_message_history(context_messages)
     
     logger.info("🔄 Router invoked with %d messages using short-term memory.", len(context_messages))
@@ -99,9 +100,9 @@ async def router(state: AgentState) -> AgentState:
         if user_id and session_id:
             ltm_history = get_last_n_messages(user_id, session_id, int(os.getenv("LONG_TERM_MEMORY")))
             ltm_history = sanitize_message_history(ltm_history)
-            context_messages = [system_message] + ltm_history
+            context_messages = [system_msg] + ltm_history
   
-            # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+            # Ensure we have a valid prompt history to LLM
             context_messages = sanitize_message_history(context_messages)
             logger.info("🔄 Router invoked with %d messages using long-term memory.", len(context_messages))
             json_ready = [to_openai_dict(m) for m in context_messages]

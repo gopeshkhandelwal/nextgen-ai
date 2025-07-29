@@ -2,7 +2,7 @@
 # Makefile for managing environment setup, model downloads, and MCP operations
 # ============================================================================
 
-.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag
+.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag build-optimum-habana run-optimum-habana stop-optimum-habana logs-optimum-habana test-optimum-habana test-optimum-habana-client shell-optimum-habana restart-optimum-habana
 
 # === Set up Python virtual environment and install dependencies ===
 install:
@@ -23,6 +23,10 @@ download-model-minilm:
 download-model-llama-2-7b-chat-hf:
 	@echo "⬇️  Downloading llama-2-7b-chat-hf embedding model..."
 	. .venv/bin/activate && python common_utils/download_model.py --model meta-llama/Llama-2-7b-chat-hf --output_dir ./resources/models/meta-llama/Llama-2-7b-chat-hf
+
+download-model-llama-3.1-8b-instruct:
+	@echo "⬇️  Downloading Meta-Llama-3.1-8B-Instruct model..."
+	. .venv/bin/activate && python common_utils/download_model.py --model meta-llama/Meta-Llama-3.1-8B-Instruct --output_dir ./resources/models/meta-llama/Meta-Llama-3.1-8B-Instruct
 
 # === Build FAISS vectorstore from documents ===
 build-vectorstore:
@@ -121,3 +125,6 @@ clean-postgres:
 	sudo deluser postgres || echo "postgres user may not exist"
 	@echo "✅ PostgreSQL completely removed!"
 	@echo "You can now run 'make setup-postgres' for a fresh installation."
+
+# Include Optimum Habana targets
+include optimum-habana-targets.mk

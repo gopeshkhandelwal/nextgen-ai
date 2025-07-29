@@ -349,3 +349,7 @@ All user and assistant messages will be stored in PostgreSQL, enabling robust lo
 
 **Security Reminder:**  
 Never commit real secrets or tokens. Use secure methods to handle sensitive information in production environments.
+
+## License
+See the [LICENSE](./LICENSE) file for full details.
+
