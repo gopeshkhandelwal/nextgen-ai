@@ -60,7 +60,12 @@ async def router(state: AgentState) -> AgentState:
         like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
         These words are important for determining the quality and depth of the response.
         
-        Do not simplify or paraphrase the user's question when calling tools."""
+        Do not simplify or paraphrase the user's question when calling tools.
+        
+        CONVERSATION CONTEXT: You can only see the current conversation history provided to you.
+        If a user asks about something that happened earlier but is not visible in the current context,
+        simply say "I don't know" or "I don't have that information in our current conversation."
+        Do not make assumptions or ask for more information that you cannot access."""
     )
     context_messages = [system_message] + state.get("messages", [])
     
@@ -72,10 +77,18 @@ async def router(state: AgentState) -> AgentState:
     logger.info("📤 Final STM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
     
     ai_msg = await llm_with_tools.ainvoke(context_messages)
-    if ai_msg.content.strip():
+    if ai_msg.content and ai_msg.content.strip():
         logger.info("🧠 LLM responded: %s", ai_msg.content)
     else:
         logger.info("🧠 LLM responded — no text content.")
+    
+    # Debug: Check if tool_calls exist
+    if hasattr(ai_msg, 'tool_calls') and ai_msg.tool_calls:
+        logger.info("🔧 Tool calls found in LLM response: %s", ai_msg.tool_calls)
+    else:
+        logger.info("❌ No tool_calls attribute found in LLM response")
+        logger.info("🔍 AI message attributes: %s", dir(ai_msg))
+        logger.info("🔍 AI message type: %s", type(ai_msg))
 
      # Check for low confidence
     if await is_low_confidence(ai_msg.content):
@@ -102,8 +115,7 @@ async def router(state: AgentState) -> AgentState:
 
     return {
         **state,
-        "messages": state["messages"] + [ai_msg],
-        "next": "extract_output"
+        "messages": state["messages"] + [ai_msg]
     }
 
 def extract_output(state: AgentState) -> AgentState:
@@ -123,6 +135,18 @@ def extract_output(state: AgentState) -> AgentState:
         "messages": state.get("messages", []) + [AIMessage(content="⚠️ No response")]
     }
 
+def should_continue(state: AgentState) -> str:
+    """
+    Determine whether to continue to tools or go to extract_output based on tool calls.
+    """
+    last_message = state["messages"][-1]
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        logger.info("🔧 Tool calls detected, routing to tools")
+        return "tools"
+    else:
+        logger.info("💬 No tool calls, routing to extract output")
+        return "extract_output"
+
 def build_graph():
     """
     Builds and compiles the LangGraph agent workflow.
@@ -131,7 +155,17 @@ def build_graph():
     builder.add_node("router", router)
     builder.add_node("tools", ToolNode(tools))
     builder.add_node("extract_output", extract_output)
-    builder.add_edge("router", "tools")
+    
+    # Add conditional edge from router
+    builder.add_conditional_edges(
+        "router",
+        should_continue,
+        {
+            "tools": "tools",
+            "extract_output": "extract_output"
+        }
+    )
+    
     builder.add_edge("tools", "extract_output")
     builder.add_edge("extract_output", END)
     builder.set_entry_point("router")
