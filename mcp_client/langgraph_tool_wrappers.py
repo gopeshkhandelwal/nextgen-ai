@@ -68,5 +68,19 @@ def build_tool_wrappers():
         })
         return result.content[0].text
 
-    tools.extend([city_weather, list_idc_pools, document_qa])
+    @tool
+    async def machine_images() -> str:
+        """
+        List all available IDC machine images used to launch compute nodes.
+
+        Use this tool when users ask about:
+        - IDC machine images
+        - Available images for creating nodes
+        - What images can be used to launch compute instances
+        - List of available IDC images
+        """
+        result = await client_session.call_tool("machine_images")
+        return result.content[0].text
+
+    tools.extend([city_weather, list_idc_pools, document_qa, machine_images])
     return tools
