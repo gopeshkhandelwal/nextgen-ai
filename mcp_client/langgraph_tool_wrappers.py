@@ -33,17 +33,24 @@ def build_tool_wrappers():
         return result.content[0].text
 
     @tool
-    async def idc_grpc_api(question: str) -> str:
+    async def document_qa(question: str, search_method: str = "hybrid", use_reranking: bool = False) -> str:
         """
-        Answer questions about IDC Compute gRPC APIs, endpoints, authentication methods, Vault integration,
+        Answer questions about IDC Compute gRPC APIs, documentation, endpoints, authentication methods, and technical details.
 
-        Returns a synthesized response using an LLM and the retrieved IDC gRPC API documentation.
+        This tool uses advanced hybrid retrieval combining BM25 keyword search and semantic vector search
+        to find relevant documents from IDC gRPC API documentation, with optional reranking for enhanced accuracy.
 
-        Supported topics include:
-        - Public/private IDC gRPC APIs and their Swagger or protobuf definitions
-        - Authentication using mTLS and Vault annotations
-        - Using grpcurl for testing or exploration
-        - Service operations like InstanceService, VNetService, MachineImageService, etc.
+        Use this tool for questions about:
+        - IDC Compute gRPC APIs and their specifications
+        - API endpoints, authentication, and integration
+        - gRPC service operations and protobuf definitions
+        - Vault integration and mTLS authentication
+        - Technical documentation and API usage
+
+        Args:
+            question: The question about IDC APIs to answer
+            search_method: Search method - "hybrid" (default), "semantic", or "keyword"  
+            use_reranking: Whether to use reranking for better relevance (slower but more accurate)
         """
         # More sophisticated trigger detection
         reranking_indicators = [
@@ -54,13 +61,26 @@ def build_tool_wrappers():
         
         use_reranking = any(indicator in question.lower() for indicator in reranking_indicators)
         print(f"mcp_client: Using reranking: {use_reranking} for question: {question}")
-        # Always use original question
         result = await client_session.call_tool("document_qa", {
             "question": question,
-            "search_method": "hybrid",
+            "search_method": search_method,
             "use_reranking": use_reranking
         })
         return result.content[0].text
 
-    tools.extend([city_weather, list_idc_pools, idc_grpc_api])
+    @tool
+    async def machine_images() -> str:
+        """
+        List all available IDC machine images used to launch compute nodes.
+
+        Use this tool when users ask about:
+        - IDC machine images
+        - Available images for creating nodes
+        - What images can be used to launch compute instances
+        - List of available IDC images
+        """
+        result = await client_session.call_tool("machine_images")
+        return result.content[0].text
+
+    tools.extend([city_weather, list_idc_pools, document_qa, machine_images])
     return tools
