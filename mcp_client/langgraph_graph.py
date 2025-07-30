@@ -35,10 +35,21 @@ async def is_low_confidence(content: str) -> bool:
     """
     Check if the response contains any low-confidence phrases.
     These phrases are configurable via the LOW_CONFIDENCE_PHRASES env variable.
+    Uses substring matching for more flexible detection.
     """
+    if not content:
+        return False
+        
     phrases = os.getenv("LOW_CONFIDENCE_PHRASES", "")
     low_conf_phrases = [p.strip().lower() for p in phrases.split(",") if p.strip()]
-    return any(phrase in content.lower() for phrase in low_conf_phrases)
+    
+    content_lower = content.lower()
+    for phrase in low_conf_phrases:
+        if phrase in content_lower:
+            logger.info(f"🔍 Low-confidence detected: found '{phrase}' in response")
+            return True
+    
+    return False
 
 # Load tools
 tools = build_tool_wrappers()
@@ -55,7 +66,15 @@ async def router(state: AgentState) -> AgentState:
     """
 
     system_message = SystemMessage(
-        content="""You are a helpful assistant. Use the tools when needed. 
+        content="""You are a helpful assistant. Use the tools when needed, but BE SELECTIVE - only call tools that are directly relevant to the user's question.
+
+        TOOL SELECTION GUIDELINES:
+        - For weather questions: ONLY use city_weather tool
+        - For IDC gRPC API questions: ONLY use document_qa tool  
+        - For IDC pools/images: ONLY use list_idc_pools or machine_images
+        - For ITAC products: ONLY use list_itac_products
+        - DO NOT call multiple tools for the same query unless explicitly needed
+        - DO NOT call document_qa for weather, general questions, or non-IDC topics
         
         IMPORTANT: When calling tools, preserve the user's EXACT question including all qualifiers 
         like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
