@@ -31,6 +31,24 @@ def build_tool_wrappers():
         """
         result = await client_session.call_tool("list_idc_pools")
         return result.content[0].text
+    
+    @tool
+    async def list_itac_products() -> str:
+        """
+        Fetch and return a list of available ITAC products.
+
+        This tool queries the ITAC API to retrieve product information and extracts their
+        names for listing.
+
+        Requirements:
+        - The environment variable ITAC_API_TOKEN must be set.
+        - The endpoint URL must be provided via ITAC_PRODUCTS.
+
+        Returns:
+        - A newline-separated string of ITAC product names, or an error message if none are found.
+        """
+        result = await client_session.call_tool("list_itac_products")
+        return result.content[0].text
 
     @tool
     async def document_qa(question: str, search_method: str = "hybrid", use_reranking: bool = False) -> str:
@@ -82,5 +100,5 @@ def build_tool_wrappers():
         result = await client_session.call_tool("machine_images")
         return result.content[0].text
 
-    tools.extend([city_weather, list_idc_pools, document_qa, machine_images])
+    tools.extend([city_weather, list_idc_pools, list_itac_products, document_qa, machine_images])
     return tools

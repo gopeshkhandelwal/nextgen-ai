@@ -100,7 +100,7 @@ async def router(state: AgentState) -> AgentState:
         if user_id and session_id:
             ltm_history = get_last_n_messages(user_id, session_id, int(os.getenv("LONG_TERM_MEMORY")))
             ltm_history = sanitize_message_history(ltm_history)
-            context_messages = [system_msg] + ltm_history
+            context_messages = [system_message] + ltm_history
   
             # Ensure we have a valid prompt history to LLM
             context_messages = sanitize_message_history(context_messages)
