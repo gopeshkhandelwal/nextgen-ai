@@ -35,10 +35,21 @@ async def is_low_confidence(content: str) -> bool:
     """
     Check if the response contains any low-confidence phrases.
     These phrases are configurable via the LOW_CONFIDENCE_PHRASES env variable.
+    Uses substring matching for more flexible detection.
     """
+    if not content:
+        return False
+        
     phrases = os.getenv("LOW_CONFIDENCE_PHRASES", "")
     low_conf_phrases = [p.strip().lower() for p in phrases.split(",") if p.strip()]
-    return any(phrase in content.lower() for phrase in low_conf_phrases)
+    
+    content_lower = content.lower()
+    for phrase in low_conf_phrases:
+        if phrase in content_lower:
+            logger.info(f"🔍 Low-confidence detected: found '{phrase}' in response")
+            return True
+    
+    return False
 
 # Load tools
 tools = build_tool_wrappers()
@@ -53,18 +64,32 @@ async def router(state: AgentState) -> AgentState:
     - Uses short-term memory by default.    
     - Automatically retries with long-term memory if LLM response is low-confidence.
     """
+
     system_message = SystemMessage(
-        content="""You are a helpful assistant. Use the tools when needed. 
+        content="""You are a helpful assistant. Use the tools when needed, but BE SELECTIVE - only call tools that are directly relevant to the user's question.
+
+        TOOL SELECTION GUIDELINES:
+        - For weather questions: ONLY use city_weather tool
+        - For IDC gRPC API questions: ONLY use document_qa tool  
+        - For IDC pools/images: ONLY use list_idc_pools or machine_images
+        - For ITAC products: ONLY use list_itac_products
+        - DO NOT call multiple tools for the same query unless explicitly needed
+        - DO NOT call document_qa for weather, general questions, or non-IDC topics
         
         IMPORTANT: When calling tools, preserve the user's EXACT question including all qualifiers 
         like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
         These words are important for determining the quality and depth of the response.
         
-        Do not simplify or paraphrase the user's question when calling tools."""
+        Do not simplify or paraphrase the user's question when calling tools.
+        
+        CONVERSATION CONTEXT: You can only see the current conversation history provided to you.
+        If a user asks about something that happened earlier but is not visible in the current context,
+        simply say "I don't know" or "I don't have that information in our current conversation."
+        Do not make assumptions or ask for more information that you cannot access."""
     )
     context_messages = [system_message] + state.get("messages", [])
     
-    # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+    # Ensure we have a valid prompt history to LLM
     context_messages = sanitize_message_history(context_messages)
     
     logger.info("🔄 Router invoked with %d messages using short-term memory.", len(context_messages))
@@ -72,10 +97,18 @@ async def router(state: AgentState) -> AgentState:
     logger.info("📤 Final STM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
     
     ai_msg = await llm_with_tools.ainvoke(context_messages)
-    if ai_msg.content.strip():
+    if ai_msg.content and ai_msg.content.strip():
         logger.info("🧠 LLM responded: %s", ai_msg.content)
     else:
         logger.info("🧠 LLM responded — no text content.")
+    
+    # Debug: Check if tool_calls exist
+    if hasattr(ai_msg, 'tool_calls') and ai_msg.tool_calls:
+        logger.info("🔧 Tool calls found in LLM response: %s", ai_msg.tool_calls)
+    else:
+        logger.info("❌ No tool_calls attribute found in LLM response")
+        logger.info("🔍 AI message attributes: %s", dir(ai_msg))
+        logger.info("🔍 AI message type: %s", type(ai_msg))
 
      # Check for low confidence
     if await is_low_confidence(ai_msg.content):
@@ -88,7 +121,7 @@ async def router(state: AgentState) -> AgentState:
             ltm_history = sanitize_message_history(ltm_history)
             context_messages = [system_message] + ltm_history
   
-            # Ensure we have a valid prompt history to LLM [[system (optional)] → user → assistant → user]
+            # Ensure we have a valid prompt history to LLM
             context_messages = sanitize_message_history(context_messages)
             logger.info("🔄 Router invoked with %d messages using long-term memory.", len(context_messages))
             json_ready = [to_openai_dict(m) for m in context_messages]
@@ -102,8 +135,7 @@ async def router(state: AgentState) -> AgentState:
 
     return {
         **state,
-        "messages": state["messages"] + [ai_msg],
-        "next": "extract_output"
+        "messages": state["messages"] + [ai_msg]
     }
 
 def extract_output(state: AgentState) -> AgentState:
@@ -123,6 +155,18 @@ def extract_output(state: AgentState) -> AgentState:
         "messages": state.get("messages", []) + [AIMessage(content="⚠️ No response")]
     }
 
+def should_continue(state: AgentState) -> str:
+    """
+    Determine whether to continue to tools or go to extract_output based on tool calls.
+    """
+    last_message = state["messages"][-1]
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        logger.info("🔧 Tool calls detected, routing to tools")
+        return "tools"
+    else:
+        logger.info("💬 No tool calls, routing to extract output")
+        return "extract_output"
+
 def build_graph():
     """
     Builds and compiles the LangGraph agent workflow.
@@ -131,7 +175,17 @@ def build_graph():
     builder.add_node("router", router)
     builder.add_node("tools", ToolNode(tools))
     builder.add_node("extract_output", extract_output)
-    builder.add_edge("router", "tools")
+    
+    # Add conditional edge from router
+    builder.add_conditional_edges(
+        "router",
+        should_continue,
+        {
+            "tools": "tools",
+            "extract_output": "extract_output"
+        }
+    )
+    
     builder.add_edge("tools", "extract_output")
     builder.add_edge("extract_output", END)
     builder.set_entry_point("router")

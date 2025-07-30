@@ -154,7 +154,7 @@ See `.env.example` for all required and optional variables, including:
 - `RAG_RERANK_CANDIDATE_MULTIPLIER=3` (candidate multiplier for reranking)
 
 ### **IDC Integration**
-- `IDC_API_POOLS`, `IDC_API_IMAGES`, `IDC_API_TOKEN`, etc.
+- `IDC_API_POOLS`, `IDC_API_IMAGES`, `ITAC_API_TOKEN`, etc.
 
 ### **Database Configuration**
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
@@ -349,3 +349,7 @@ All user and assistant messages will be stored in PostgreSQL, enabling robust lo
 
 **Security Reminder:**  
 Never commit real secrets or tokens. Use secure methods to handle sensitive information in production environments.
+
+## License
+See the [LICENSE](./LICENSE) file for full details.
+
