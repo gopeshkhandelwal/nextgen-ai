@@ -1,3 +1,6 @@
+# Author: Gopesh Khandelwal
+# Email: gopesh.khandelwal@intel.com
+
 import os
 import sys
 import logging

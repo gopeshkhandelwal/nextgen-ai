@@ -1,3 +1,6 @@
+# Author: Gopesh Khandelwal
+# Email: gopesh.khandelwal@intel.com
+
 from langchain_core.tools import tool
 from mcp import ClientSession
 

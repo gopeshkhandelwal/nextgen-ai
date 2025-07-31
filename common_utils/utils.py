@@ -1,3 +1,6 @@
+# Author: Gopesh Khandelwal
+# Email: gopesh.khandelwal@intel.com
+
 import logging
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 

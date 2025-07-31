@@ -1,3 +1,6 @@
+# Author: Gopesh Khandelwal
+# Email: gopesh.khandelwal@intel.com
+
 # ============================================================================
 # Makefile for managing environment setup, model downloads, and MCP operations
 # ============================================================================

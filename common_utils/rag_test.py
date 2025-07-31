@@ -1,3 +1,6 @@
+# Author: Gopesh Khandelwal
+# Email: gopesh.khandelwal@intel.com
+
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 import os

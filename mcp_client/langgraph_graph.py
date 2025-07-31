@@ -1,3 +1,6 @@
+# Author: Gopesh Khandelwal
+# Email: gopesh.khandelwal@intel.com
+
 import os
 import logging
 from typing import Annotated, List, TypedDict

@@ -1,3 +1,8 @@
+<!--
+Author: Gopesh Khandelwal
+Email: gopesh.khandelwal@intel.com
+-->
+
 # ITAC AI Agent (An end-to-end GenAI framework)
 
 ## Overview
