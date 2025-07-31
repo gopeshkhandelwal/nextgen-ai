@@ -1,5 +1,7 @@
 import os
 import logging
+import uuid
+import time
 from typing import Annotated, List, TypedDict
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
@@ -13,6 +15,15 @@ from common_utils.config import get_llm
 from common_utils.utils import to_openai_dict, sanitize_message_history
 import json
 
+# Langfuse integration
+try:
+    from langfuse.callback import CallbackHandler
+    from langfuse import Langfuse
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    print("⚠️ Langfuse not installed. Run: pip install langfuse")
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,6 +31,22 @@ load_dotenv()
 # Configure logging for the module
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
+
+# Initialize Langfuse if available and enabled
+langfuse_handler = None
+if LANGFUSE_AVAILABLE and os.getenv("LANGFUSE_ENABLED", "false").lower() == "true":
+    try:
+        langfuse_handler = CallbackHandler(
+            public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+            secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+            host=os.getenv("LANGFUSE_HOST", "http://localhost:3000")
+        )
+        logger.info("✅ Langfuse monitoring enabled")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to initialize Langfuse: {e}")
+        langfuse_handler = None
+else:
+    logger.info("🔍 Langfuse monitoring disabled")
 
 class AgentState(TypedDict, total=False):
     """
@@ -29,6 +56,8 @@ class AgentState(TypedDict, total=False):
     output: str
     user_id: str
     session_id: str
+    trace_id: str  # For E2E tracing
+    start_time: float  # For performance monitoring
     
 # Function to check if the LLM response is low-confidence
 async def is_low_confidence(content: str) -> bool:
@@ -64,7 +93,14 @@ async def router(state: AgentState) -> AgentState:
     - Uses short-term memory by default.    
     - Automatically retries with long-term memory if LLM response is low-confidence.
     """
+    # Initialize tracing for this request
+    if "trace_id" not in state:
+        state["trace_id"] = str(uuid.uuid4())
+        state["start_time"] = time.time()
+        logger.info(f"🎯 Starting E2E trace: {state['trace_id']}")
 
+    trace_id = state["trace_id"]
+    
     system_message = SystemMessage(
         content="""You are a helpful assistant. Use the tools when needed, but BE SELECTIVE - only call tools that are directly relevant to the user's question.
 
@@ -92,27 +128,35 @@ async def router(state: AgentState) -> AgentState:
     # Ensure we have a valid prompt history to LLM
     context_messages = sanitize_message_history(context_messages)
     
-    logger.info("🔄 Router invoked with %d messages using short-term memory.", len(context_messages))
+    logger.info(f"🔄 [{trace_id}] Router invoked with %d messages using short-term memory.", len(context_messages))
     json_ready = [to_openai_dict(m) for m in context_messages]
-    logger.info("📤 Final STM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
+    logger.info(f"📤 [{trace_id}] Final STM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
     
-    ai_msg = await llm_with_tools.ainvoke(context_messages)
+    # Prepare callbacks for Langfuse tracing
+    callbacks = []
+    if langfuse_handler:
+        callbacks.append(langfuse_handler)
+    
+    start_llm = time.time()
+    ai_msg = await llm_with_tools.ainvoke(context_messages, config={"callbacks": callbacks})
+    llm_duration = time.time() - start_llm
+    
     if ai_msg.content and ai_msg.content.strip():
-        logger.info("🧠 LLM responded: %s", ai_msg.content)
+        logger.info(f"🧠 [{trace_id}] LLM responded ({llm_duration:.2f}s): %s", ai_msg.content)
     else:
-        logger.info("🧠 LLM responded — no text content.")
+        logger.info(f"🧠 [{trace_id}] LLM responded ({llm_duration:.2f}s) — no text content.")
     
     # Debug: Check if tool_calls exist
     if hasattr(ai_msg, 'tool_calls') and ai_msg.tool_calls:
-        logger.info("🔧 Tool calls found in LLM response: %s", ai_msg.tool_calls)
+        logger.info(f"🔧 [{trace_id}] Tool calls found in LLM response: %s", ai_msg.tool_calls)
     else:
-        logger.info("❌ No tool_calls attribute found in LLM response")
-        logger.info("🔍 AI message attributes: %s", dir(ai_msg))
-        logger.info("🔍 AI message type: %s", type(ai_msg))
+        logger.info(f"❌ [{trace_id}] No tool_calls attribute found in LLM response")
+        logger.info(f"🔍 [{trace_id}] AI message attributes: %s", dir(ai_msg))
+        logger.info(f"🔍 [{trace_id}] AI message type: %s", type(ai_msg))
 
      # Check for low confidence
     if await is_low_confidence(ai_msg.content):
-        logger.warning("⚠️ Low-confidence response detected — switching to long-term memory.")
+        logger.warning(f"⚠️ [{trace_id}] Low-confidence response detected — switching to long-term memory.")
         user_id = state.get("user_id")
         session_id = state.get("session_id")
 
@@ -123,15 +167,17 @@ async def router(state: AgentState) -> AgentState:
   
             # Ensure we have a valid prompt history to LLM
             context_messages = sanitize_message_history(context_messages)
-            logger.info("🔄 Router invoked with %d messages using long-term memory.", len(context_messages))
+            logger.info(f"🔄 [{trace_id}] Router invoked with %d messages using long-term memory.", len(context_messages))
             json_ready = [to_openai_dict(m) for m in context_messages]
-            logger.info("📤 Final LTM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
+            logger.info(f"📤 [{trace_id}] Final LTM payload to LLM:\n%s", json.dumps(json_ready, indent=2))
             
             # Retry with long-term memory
-            ai_msg = await llm_with_tools.ainvoke(context_messages)
-            logger.info("🔁 Retried with LTM. New response: %s", ai_msg.content)
+            start_ltm = time.time()
+            ai_msg = await llm_with_tools.ainvoke(context_messages, config={"callbacks": callbacks})
+            ltm_duration = time.time() - start_ltm
+            logger.info(f"🔁 [{trace_id}] Retried with LTM ({ltm_duration:.2f}s). New response: %s", ai_msg.content)
         else:
-            logger.warning("⚠️ LTM fetch skipped due to missing user/session info.")
+            logger.warning(f"⚠️ [{trace_id}] LTM fetch skipped due to missing user/session info.")
 
     return {
         **state,
@@ -142,13 +188,20 @@ def extract_output(state: AgentState) -> AgentState:
     """
     Extracts the latest assistant message as output.
     """
+    trace_id = state.get("trace_id", "unknown")
+    start_time = state.get("start_time", time.time())
+    total_duration = time.time() - start_time
+    
     for msg in reversed(state.get("messages", [])):
         if hasattr(msg, "content") and isinstance(msg.content, str):
+            logger.info(f"✅ [{trace_id}] E2E flow completed ({total_duration:.2f}s): {msg.content[:100]}...")
             return {
                 **state,
                 "output": msg.content,
                 "messages": state["messages"] + [AIMessage(content=msg.content)]
             }
+    
+    logger.warning(f"⚠️ [{trace_id}] E2E flow completed ({total_duration:.2f}s) with no response")
     return {
         **state,
         "output": "⚠️ No response",
@@ -159,12 +212,13 @@ def should_continue(state: AgentState) -> str:
     """
     Determine whether to continue to tools or go to extract_output based on tool calls.
     """
+    trace_id = state.get("trace_id", "unknown")
     last_message = state["messages"][-1]
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        logger.info("🔧 Tool calls detected, routing to tools")
+        logger.info(f"🔧 [{trace_id}] Tool calls detected, routing to tools")
         return "tools"
     else:
-        logger.info("💬 No tool calls, routing to extract output")
+        logger.info(f"💬 [{trace_id}] No tool calls, routing to extract output")
         return "extract_output"
 
 def build_graph():

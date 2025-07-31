@@ -1,0 +1,22 @@
+<yandex>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+    <storage_configuration>
+        <disks>
+            <default>
+                <path>/var/lib/clickhouse/</path>
+            </default>
+        </disks>
+        <policies>
+            <default>
+                <volumes>
+                    <default>
+                        <disk>default</disk>
+                    </default>
+                </volumes>
+            </default>
+        </policies>
+    </storage_configuration>
+</yandex>

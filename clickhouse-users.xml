@@ -1,0 +1,16 @@
+<yandex>
+  <users>
+    <default>
+      <password>changeme</password>
+      <networks>
+        <ip>::/0</ip> <!-- Allow access from any IP (e.g., from langfuse container) -->
+      </networks>
+    </default>
+  </users>
+  <profiles>
+      <default>
+          <allow_experimental_database_materialized_postgresql>0</allow_experimental_database_materialized_postgresql>
+          <allow_experimental_database_replicated>0</allow_experimental_database_replicated>
+      </default>
+  </profiles>
+</yandex>

@@ -2,10 +2,17 @@
 # Makefile for managing environment setup, model downloads, and MCP operations
 # ============================================================================
 
-.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag start-nextgen-suite start-vllm-hermes-suite test-vllm-hermes
+.PHONY: install install-system-deps run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag start-nextgen-suite start-vllm-hermes-suite test-vllm-hermes start-langfuse stop-langfuse langfuse-logs
+
+
+# === Install system dependencies (Docker, Docker Compose) ===
+install-system-deps:
+	@echo "🔧 Installing system dependencies (Docker, Docker Compose)..."
+	sudo apt-get update
+	sudo apt-get install -y docker.io docker-compose
 
 # === Set up Python virtual environment and install dependencies ===
-install:
+install: install-system-deps
 	python3 -m venv .venv
 	. .venv/bin/activate && pip install -U pip
 	. .venv/bin/activate && pip install -r requirements.txt
@@ -125,3 +132,25 @@ clean-postgres:
 	sudo deluser postgres || echo "postgres user may not exist"
 	@echo "✅ PostgreSQL completely removed!"
 	@echo "You can now run 'make setup-postgres' for a fresh installation."
+
+# === Langfuse Monitoring ===
+start-langfuse:
+	@echo "🚀 Starting Langfuse monitoring stack..."
+	docker compose -f docker-compose.langfuse.yml up -d
+	@echo "✅ Langfuse started at http://localhost:3000"
+	@echo "📊 Login with admin/admin on first visit"
+
+stop-langfuse:
+	@echo "🛑 Stopping Langfuse monitoring stack..."
+	docker-compose -f docker-compose.langfuse.yml down
+
+langfuse-logs:
+	@echo "📋 Showing Langfuse logs..."
+	docker-compose -f docker-compose.langfuse.yml logs -f
+
+# === E2E Monitoring with Langfuse ===
+start-nextgen-suite-with-monitoring: start-langfuse
+	@echo "🔍 Starting NextGen AI with E2E monitoring..."
+	@echo "📊 Langfuse dashboard: http://localhost:3000"
+	@echo "🤖 Starting AI agent..."
+	make start-nextgen-suite

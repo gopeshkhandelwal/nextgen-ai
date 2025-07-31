@@ -1,0 +1,57 @@
+services:
+  langfuse-db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse_password@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: your-nextauth-secret-change-me-123456
+      NEXTAUTH_URL: http://localhost:3000
+      SALT: your-salt-change-me-456789
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: changeme
+      CLICKHOUSE_DISABLE_CLUSTER_MIGRATION: "true"
+      CLICKHOUSE_DEFAULT_PROFILE: default
+    volumes:
+      - langfuse_data:/app/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse-config.xml:/etc/clickhouse-server/config.d/custom.xml:ro
+      - ./clickhouse-users.xml:/etc/clickhouse-server/users.d/custom.xml:ro
+
+volumes:
+  langfuse_db_data:
+  langfuse_data:
+  clickhouse_data:
