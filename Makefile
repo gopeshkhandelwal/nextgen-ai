@@ -156,6 +156,7 @@ run-vllm-hermes:
 		--name vllm-hermes-server \
 		-p 8000:8000 \
 		--runtime=habana \
+		-e HABANA_LOG_LEVEL=debug \
 		-e HABANA_VISIBLE_DEVICES=all \
 		--cap-add=sys_nice \
 		--net=host \
@@ -173,7 +174,8 @@ run-vllm-hermes:
 			--enforce-eager \
 			--host 0.0.0.0 \
 			--enable-auto-tool-choice \
-			--tool-call-parser hermes
+			--tool-call-parser hermes \
+			--tensor-parallel-size 8
 	@echo "✅ vLLM-Hermes server started!"
 	@echo "Waiting for server to be ready..."
 	@sleep 10
