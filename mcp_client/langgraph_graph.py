@@ -74,7 +74,6 @@ async def router(state: AgentState) -> AgentState:
         TOOL SELECTION GUIDELINES:
         - For weather questions: ONLY use city_weather tool
         - For IDC gRPC API questions: ONLY use document_qa tool  
-        - For IDC pools/images: ONLY use list_idc_pools or machine_images
         - For ITAC products: ONLY use list_itac_products
         - DO NOT call multiple tools for the same query unless explicitly needed
         - DO NOT call document_qa for weather, general questions, or non-IDC topics

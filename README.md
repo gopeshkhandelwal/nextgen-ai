@@ -93,7 +93,7 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
 
 8. **Interact with the system**
     Enter natural language queries such as:
-    - "List all IDC pools"
+    - "List of all available ITAC products"
     - "What is the weather in Dallas?"
     - "Give me a detailed explanation of IDC gRPC APIs"
     
@@ -159,7 +159,7 @@ See `.env.example` for all required and optional variables, including:
 - `RAG_RERANK_CANDIDATE_MULTIPLIER=3` (candidate multiplier for reranking)
 
 ### **IDC Integration**
-- `IDC_API_POOLS`, `IDC_API_IMAGES`, `ITAC_API_TOKEN`, etc.
+- `ITAC_PRODUCTS` 
 
 ### **Database Configuration**
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
@@ -216,9 +216,9 @@ make test-rag
 make start-nextgen-suite
 
 # Test different query types:
-# 1. Simple factual: "What is IDC?"
-# 2. Complex technical: "How do I set up mTLS authentication for IDC gRPC APIs?"
-# 3. Detailed request: "Give me a comprehensive guide to IDC compute pools"
+# 1. Simple factual: "What is USA Capital?"
+# 2. Complex technical: "Give info on IDC gRPC API"
+# 3. Detailed request: "List of all available ITAC products"
 ```
 
 ## Complete Setup Example
@@ -250,7 +250,7 @@ make start-nextgen-suite
 ## Troubleshooting
 
 ### **Common Issues**
-- **Failed to retrieve IDC pools/images**: Ensure your tool is not using Proxy.
+- **Failed to retrieve IDC products**: Ensure your tool is not using Proxy.
   ```sh
   export NO_PROXY=
   export no_proxy=
