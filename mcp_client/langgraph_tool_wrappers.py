@@ -16,25 +16,7 @@ def build_tool_wrappers():
         print(f"mcp_client: Fetching weather for city: {city}")
         result = await client_session.call_tool("city_weather", {"city": city})
         return result.content[0].text
-
-    @tool
-    async def list_idc_pools() -> str:
-        """
-        Fetch and return a list of available IDC compute node pool names.
-
-        This tool queries the IDC Compute API to retrieve computeNodePools and extracts their
-        poolName field for listing.
-
-        Requirements:
-        - The environment variable IDC_API_TOKEN must be set.
-        - The endpoint URL must be provided via IDC_API_POOLS.
-
-        Returns:
-        - A newline-separated string of compute pool names, or an error message if none are found.
-        """
-        result = await client_session.call_tool("list_idc_pools")
-        return result.content[0].text
-    
+   
     @tool
     async def list_itac_products() -> str:
         """
@@ -72,7 +54,6 @@ def build_tool_wrappers():
         - Weather information (use city_weather instead)
         - General questions not related to IDC APIs
         - ITAC products (use list_itac_products instead)
-        - IDC pools or images (use specific tools for those)
 
         Args:
             question: The question about IDC APIs to answer
@@ -94,20 +75,7 @@ def build_tool_wrappers():
             "use_reranking": use_reranking
         })
         return result.content[0].text
+   
 
-    @tool
-    async def machine_images() -> str:
-        """
-        List all available IDC machine images used to launch compute nodes.
-
-        Use this tool when users ask about:
-        - IDC machine images
-        - Available images for creating nodes
-        - What images can be used to launch compute instances
-        - List of available IDC images
-        """
-        result = await client_session.call_tool("machine_images")
-        return result.content[0].text
-
-    tools.extend([city_weather, list_idc_pools, list_itac_products, document_qa, machine_images])
+    tools.extend([city_weather, list_itac_products, document_qa])
     return tools
