@@ -24,5 +24,5 @@ vectorstore = FAISS.load_local(INDEX_DIR, embedding_model, allow_dangerous_deser
 retriever = vectorstore.as_retriever()
 
 # Now you can use retriever.invoke or retriever.get_relevant_documents
-docs = retriever.invoke("IDC gRPC API Guide")
+docs = retriever.invoke("ITAC gRPC API Guide")
 print(docs)

@@ -5,7 +5,7 @@
 # Makefile for managing environment setup, model downloads, and MCP operations
 # ============================================================================
 
-.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag start-nextgen-suite start-vllm-hermes-suite test-vllm-hermes
+.PHONY: install run-mcp download-model-minilm build-vectorstore setup-postgres install-postgres-deps clean-postgres clean test-rag start-nextgen-suite start-vllm-hermes-suite test-vllm-hermes logs-vllm-hermes
 
 # === Set up Python virtual environment and install dependencies ===
 install:
@@ -128,3 +128,88 @@ clean-postgres:
 	sudo deluser postgres || echo "postgres user may not exist"
 	@echo "✅ PostgreSQL completely removed!"
 	@echo "You can now run 'make setup-postgres' for a fresh installation."
+
+
+# === vLLM-Hermes Setup and Management ===
+build-vllm-hermes:
+	@echo "🔥 Building vLLM-Hermes Docker image..."
+	@if [ ! -f .env ]; then \
+		echo "❌ Error: .env file not found!"; \
+		echo "Please create .env with HUGGINGFACE_HUB_TOKEN"; \
+		exit 1; \
+	fi
+	$(eval include .env)
+	$(eval export $(shell sed 's/=.*//' .env))
+	@if [ -z "$(HUGGINGFACE_HUB_TOKEN)" ]; then \
+		echo "❌ Error: HUGGINGFACE_HUB_TOKEN not found in .env"; \
+		exit 1; \
+	fi
+	docker build \
+		--build-arg HF_TOKEN=$(HUGGINGFACE_HUB_TOKEN) \
+		-t vllm-fork-hermes-2-pro-llama-3-8b:1.0 \
+		-f $(CURDIR)/deployment/docker/vllm.Dockerfile $(CURDIR)
+	@echo "✅ vLLM-Hermes image built successfully!"
+
+run-vllm-hermes:
+	@echo "🚀 Starting vLLM-Hermes server with function calling..."
+	docker run -d \
+		--name vllm-hermes-server \
+		-p 8000:8000 \
+		--runtime=habana \
+		-e HABANA_VISIBLE_DEVICES=all \
+		--cap-add=sys_nice \
+		--net=host \
+		--ipc=host \
+		vllm-fork-hermes-2-pro-llama-3-8b:1.0 \
+		python3 -m vllm.entrypoints.openai.api_server \
+			--port 8000 \
+			--model /app/models/Hermes-2-Pro-Llama-3-8B \
+			--served-model-name vllm-fork-with-hermes-2-pro-llama-3-8b \
+			--max-model-len 8192 \
+			--max-num-seqs 1 \
+			--disable-log-stats \
+			--tokenizer-pool-type none \
+			--gpu-memory-utilization 0.8 \
+			--enforce-eager \
+			--host 0.0.0.0 \
+			--enable-auto-tool-choice \
+			--tool-call-parser hermes
+	@echo "✅ vLLM-Hermes server started!"
+	@echo "Waiting for server to be ready..."
+	@sleep 10
+	@echo "Testing server health..."
+	@curl -s http://localhost:8000/health > /dev/null && echo "✅ Server is healthy" || echo "⚠️  Server may still be starting"
+
+# === Setup vLLM-Hermes server for local LLM inference ===
+# This will build the Docker image, run the server, and check its health
+setup-vllm-hermes: build-vllm-hermes run-vllm-hermes
+	@echo "🎉 vLLM-Hermes setup complete!"
+	@echo "You can now run: make start-nextgen-suite"
+
+clean-vllm-hermes-container:
+	@echo "🛑 Stopping vLLM-Hermes server..."
+	docker stop vllm-hermes-server 2>/dev/null || echo "Container not running"
+	docker rm vllm-hermes-server 2>/dev/null || echo "Container not found"
+	@echo "✅ vLLM-Hermes server stopped"
+
+clean-vllm-hermes-image:
+	@echo "🗑️  Removing vllm-fork-hermes-2-pro-llama-3-8b:1.0 Docker image..."
+	docker rmi vllm-fork-hermes-2-pro-llama-3-8b:1.0 || echo "Image not found"
+	@echo "✅ vLLM-Hermes Docker image removed"
+
+check-vllm-hermes:
+	@echo "🔍 Checking vLLM-Hermes server status..."
+	@if ! docker ps | grep -q vllm-hermes-server; then \
+		echo "❌ vLLM-Hermes server is not running"; \
+		echo "Starting vLLM-Hermes server..."; \
+		$(MAKE) run-vllm-hermes; \
+	else \
+		echo "✅ vLLM-Hermes server is running"; \
+	fi
+	@echo "Testing server connectivity..."
+	@curl -s http://localhost:8000/health > /dev/null && echo "✅ Server is responding" || (echo "❌ Server not responding, restarting..." && $(MAKE) stop-vllm-hermes && $(MAKE) run-vllm-hermes)
+
+logs-vllm-hermes:
+	@echo "📜 Showing logs for vLLM-Hermes server..."
+	docker logs -f vllm-hermes-server
+	@echo "You can stop the logs with Ctrl+C"

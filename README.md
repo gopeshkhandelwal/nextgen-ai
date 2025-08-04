@@ -7,7 +7,7 @@ Email: gopesh.khandelwal@intel.com
 
 ## Overview
 
-The ITAC AI Agent is a modular, production-ready framework that integrates Large Language Models (LLMs) with Intel Developer Cloud (IDC) and MCP (Model Context Protocol) to enable intelligent agentic behavior. It combines LangGraph-based orchestration, LangChain tool-calling, and advanced RAG-powered memory with secure, auditable tool execution. The system supports natural language queries that trigger real cloud actions—backed by open-source LLMs (e.g., LLaMA, Mistral) or OpenAI-compatible APIs—and demonstrates scalable, secure integration of advanced GenAI components across infrastructure.
+The ITAC AI Agent is a modular, production-ready framework that integrates Large Language Models (LLMs) with Intel tiber developer cloud (ITAC) and MCP (Model Context Protocol) to enable intelligent agentic behavior. It combines LangGraph-based orchestration, LangChain tool-calling, and advanced RAG-powered memory with secure, auditable tool execution. The system supports natural language queries that trigger real cloud actions—backed by open-source LLMs (e.g., LLaMA, Mistral) or OpenAI-compatible APIs—and demonstrates scalable, secure integration of advanced GenAI components across infrastructure.
 
 ## Architecture
 
@@ -45,7 +45,7 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
     ```
 
 3. **Configure environment variables**
-    - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, IDC tokens, etc).
+    - Copy `.env.example` to `.env` and fill in your secrets (OpenAI API key, Hugging Face token, ITAC tokens, etc).
     - Ensure your `.env` file contains the required database configuration:
     ```properties
     DB_NAME=your_db_name
@@ -72,9 +72,6 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
     ```sh
     # Download MiniLM embedding model (required for RAG)
     make download-model-minilm
-    
-    # Optional: Download LLaMA 2 model for local inference
-    make download-model-llama-2-7b-chat-hf
     ```
 
 6. **Build the vectorstore for document Q&A**
@@ -83,16 +80,25 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
     make build-vectorstore
     ```
 
-7. **Start the application**
+7. **Build and run the vLLM Hermes server for local LLM inference**
+    ```sh
+    # Build and start the vLLM Hermes Docker image (downloads the model and vllm-fork automatically; runs on port 8000 by default)
+    make setup-vllm-hermes
+
+    # Check the logs or health endpoint to verify the server is running
+    make logs-vllm-hermes
+    ```
+
+8. **Start the application**
     ```sh
     make start-nextgen-suite
     ```
 
-8. **Interact with the system**
+9. **Interact with the system**
     Enter natural language queries such as:
     - "List of all available ITAC products"
     - "What is the weather in Dallas?"
-    - "Give me a detailed explanation of IDC gRPC APIs"
+    - "Give me a detailed explanation of ITAC gRPC APIs"
     
     The agent will automatically select and call the appropriate tools, returning results with source attribution.
 
@@ -115,16 +121,6 @@ The system includes a production-ready RAG implementation with:
 - **Smart K selection**: Simple queries use fewer docs, complex queries use more
 - **Performance optimization**: Caches results for repeated queries
 
-### **Usage Examples**
-```bash
-# Basic hybrid search (fast)
-"What is IDC gRPC API?"
-
-# Enhanced search with reranking (high quality)
-"Give me a detailed explanation of IDC gRPC authentication"
-
-# Specific search methods
-"How do I use grpcurl?" # Will use optimal method automatically
 ```
 
 ## Adding New Tools
@@ -155,7 +151,7 @@ See `.env.example` for all required and optional variables, including:
 - `RAG_RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-12-v2` (reranker model)
 - `RAG_RERANK_CANDIDATE_MULTIPLIER=3` (candidate multiplier for reranking)
 
-### **IDC Integration**
+### **ITAC Integration**
 - `ITAC_PRODUCTS` 
 
 ### **Database Configuration**
@@ -214,7 +210,7 @@ make start-nextgen-suite
 
 # Test different query types:
 # 1. Simple factual: "What is USA Capital?"
-# 2. Complex technical: "Give info on IDC gRPC API"
+# 2. Complex technical: "Give info on ITAC gRPC API"
 # 3. Detailed request: "List of all available ITAC products"
 ```
 
@@ -230,7 +226,7 @@ cd nextgen-ai
 # Configure environment variables
 cp .env.example .env
 # Edit .env file with your actual values:
-# - Set OpenAI API key, Hugging Face token, IDC tokens
+# - Set OpenAI API key, Hugging Face token, ITAC tokens
 # - Configure database settings (DB_NAME, DB_USER, DB_PASS, etc.)
 # - Set RAG and other configuration parameters
 
@@ -247,7 +243,7 @@ make start-nextgen-suite
 ## Troubleshooting
 
 ### **Common Issues**
-- **Failed to retrieve IDC products**: Ensure your tool is not using Proxy.
+- **Failed to retrieve ITAC products**: Ensure your tool is not using Proxy.
   ```sh
   export NO_PROXY=
   export no_proxy=

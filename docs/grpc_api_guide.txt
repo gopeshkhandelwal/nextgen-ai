@@ -1,24 +1,24 @@
-IDC gRPC API Guide
+ITAC gRPC API Guide
 ##################
 
-IDC add-on services that run in the IDC control plane, such as OneAPI
-and Intel Kubernetes Services, should use the IDC gRPC APIs defined in
-`IDC Compute Public gRPC Protobuf specification`_ and
-`IDC Compute Private gRPC Protobuf specification`_ to
+ITAC add-on services that run in the ITAC control plane, such as OneAPI
+and Intel Kubernetes Services, should use the ITAC gRPC APIs defined in
+`ITAC Compute Public gRPC Protobuf specification`_ and
+`ITAC Compute Private gRPC Protobuf specification`_ to
 create, read, update, and delete (CRUD) instances and related objects.
 
 API Documentation
 *****************
 
--  Some IDC gRPC APIs are intended for the public and/or use by the IDC
+-  Some ITAC gRPC APIs are intended for the public and/or use by the ITAC
    Console. These have equivalent REST APIs provided through the
    `gRPC-REST Gateway`_.
    The Swagger (OpenAPI) specification is available at
    https://compute-us-region-1-api.cloud.intel.com/openapiv2/ and
-   `IDC Compute Public OpenAPI specification`_.
--  `IDC Compute Public gRPC Protobuf specification`_.
--  `IDC Compute Private gRPC Protobuf specification`_.
-   These APIs are intended for use only by trusted IDC services.
+   `ITAC Compute Public OpenAPI specification`_.
+-  `ITAC Compute Public gRPC Protobuf specification`_.
+-  `ITAC Compute Private gRPC Protobuf specification`_.
+   These APIs are intended for use only by trusted ITAC services.
 
 API Endpoints
 *************
@@ -47,11 +47,11 @@ Production API Endpoints
 Authentication
 **************
 
-Authentication for IDC Services
+Authentication for ITAC Services
 ===============================
 
-IDC services should authenticate with other IDC services using mTLS. TLS
-certificates and keys should be mounted in the IDC service container
+ITAC services should authenticate with other ITAC services using mTLS. TLS
+certificates and keys should be mounted in the ITAC service container
 using Vault annotations. An example is shown below.
 
 .. code-block: yaml
@@ -77,12 +77,12 @@ using Vault annotations. An example is shown below.
        vault.hashicorp.com/role: us-dev-1a-instance-replicator-role
        vault.hashicorp.com/service: http://dev4-vault.idcs-dev.intel.com:80
 
-Helm charts for IDC services should include these annotations by adding
+Helm charts for ITAC services should include these annotations by adding
 ``{{- include "idc-common.vaultPkiAnnotations" . | nindent 8 }}`` to the
 deployment. For example, see
 `deployment/charts/instance-replicator/templates/deployment.yaml <https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/deployment/charts/instance-replicator/templates/deployment.yaml>`__.
 
-Generate a TLS Client Certificate for IDC Developers
+Generate a TLS Client Certificate for ITAC Developers
 ====================================================
 
 Intel employees with the appropriate permissions to Vault can follow
@@ -92,13 +92,13 @@ these steps to generate a TLS client certificate.
 
 #. Open the top-right menu and click “Copy token”.
 
-#. Create the file ``local/secrets/${IDC_ENV}/VAULT_TOKEN`` and paste the token.
+#. Create the file ``local/secrets/${ITAC_ENV}/VAULT_TOKEN`` and paste the token.
 
 #. Run:
 
 .. code-block:: bash
 
-   export IDC_ENV=prod
+   export ITAC_ENV=prod
    export COMMON_NAME=${USER}
    export CREATE_ROLE=1
    make generate-vault-pki-cert
@@ -106,7 +106,7 @@ these steps to generate a TLS client certificate.
 #. This will create the following files:
 
    - ca.pem: 
-         The public certificate for the IDC Root Certificate Authority.
+         The public certificate for the ITAC Root Certificate Authority.
          This will be used by your application to verify the gRPC server (TLS server).
    - cert.pem:
          The public certificate chain for ``${COMMON_NAME}``.
@@ -143,17 +143,17 @@ This section explains how to create (launch) a bare metal or virtual machine (VM
 Create a Cloud Account
 ======================
 
-Cloud Accounts must be created using the `IDC Console`_.
+Cloud Accounts must be created using the `ITAC Console`_.
 
 Create a VNet
 =============
 
-The default VNet for a Cloud Account is created by the `IDC Console`_.
+The default VNet for a Cloud Account is created by the `ITAC Console`_.
 In the future, additional VNets can be created using the VNet API.
 For example, see `vnet_create_with_name.sh`_.
 
 Note that this example and the others below use the REST API through the `gRPC-REST Gateway`_.
-IDC services should directly use the corresponding gRPC client.
+ITAC services should directly use the corresponding gRPC client.
 
 Create (Upload) an SSH Public Key
 =================================
@@ -167,22 +167,22 @@ See `Create an Instance with grpcurl`_.
 
 See also `instance_create_with_name.sh`_.
 
-Testing the IDC Compute GPRC API with *grpcurl*
+Testing the ITAC Compute GPRC API with *grpcurl*
 -----------------------------------------------
 
 `grpcurl`_ is a command-line tool that lets you interact with gRPC servers.
 
 It can be installed with :command:`make install-interactive-tools`.
 
-List IDC Compute GRPC API Services with *grpcurl*
+List ITAC Compute GRPC API Services with *grpcurl*
 =================================================
 
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    list
 
@@ -206,9 +206,9 @@ Describe InstanceService RPCs with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    describe proto.InstanceService
 
@@ -274,9 +274,9 @@ messages contained within other messages.
 
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    describe proto.InstanceCreateRequest
 
@@ -293,9 +293,9 @@ Expected output:
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    describe proto.InstanceSpec
 
@@ -324,9 +324,9 @@ authorized, the service will always respond with an empty message.
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    -d '{}' \
    ${REGIONAL_GRPC_API}:443 \
    proto.InstanceService/Ping
@@ -347,9 +347,9 @@ Create an Instance with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    -d '{
          "metadata": {
            "cloudAccountId": "442434389234",
@@ -413,9 +413,9 @@ List Instances with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    -d '{"metadata": {"cloudAccountId": "442434389234"}}' \
    ${REGIONAL_GRPC_API}:443 \
    proto.InstanceService/Search
@@ -481,9 +481,9 @@ Delete an Instance with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    -d '{"metadata": {"cloudAccountId": "442434389234", "name": "tiny2"}}' \
    ${REGIONAL_GRPC_API}:443 \
    proto.InstanceService/Delete
@@ -502,9 +502,9 @@ List Machine Images with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    proto.MachineImageService/Search
 
@@ -524,9 +524,9 @@ Describe IpResourceManagerService RPCs with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    describe proto.IpResourceManagerService
 
@@ -552,9 +552,9 @@ List Subnets with *grpcurl*
 .. code-block:: bash
 
    grpcurl \
-   --cacert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/ca.pem \
-   --cert local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.pem \
-   --key local/secrets/${IDC_ENV}/pki/${COMMON_NAME}/cert.key \
+   --cacert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/ca.pem \
+   --cert local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.pem \
+   --key local/secrets/${ITAC_ENV}/pki/${COMMON_NAME}/cert.key \
    ${REGIONAL_GRPC_API}:443 \
    proto.IpResourceManagerService/SearchSubnetStream
 
@@ -586,9 +586,9 @@ Create a Vnet with *grpcurl*
 .. code-block:: bash
 
   grpcurl \
-  --cacert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
-  --cert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
-  --key ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
+  --cacert ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
+  --cert ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
+  --key ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
   -d '{
         "metadata": {
             "cloudAccountId": "373413096085",
@@ -630,9 +630,9 @@ Get VNet with *grpcurl*
 .. code-block:: bash
 
   grpcurl \
-  --cacert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
-  --cert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
-  --key ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
+  --cacert ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
+  --cert ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
+  --key ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
    -d '{"metadata": {"cloudAccountId": "373413096085","name": "us-dev-1b-metal"}}' \
   ${REGIONAL_GRPC_API}:443 \
   proto.VNetPrivateService/GetPrivate
@@ -663,9 +663,9 @@ Set trunk groups on existing VNet *grpcurl*
 .. code-block:: bash
 
   grpcurl \
-  --cacert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
-  --cert ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
-  --key ${IDC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
+  --cacert ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/ca.pem \
+  --cert ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.pem \
+  --key ${ITAC_DIR}/local/secrets/pki/${COMMON_NAME}/cert.key \
   -d '{
         "vNetReference": {
             "cloudAccountId": "373413096085",
@@ -706,11 +706,11 @@ References
 
 
 
-.. _IDC Compute Public gRPC Protobuf specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute.proto
-.. _IDC Compute Private gRPC Protobuf specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute_private.proto
-.. _IDC Compute Public OpenAPI specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute.swagger.json
+.. _ITAC Compute Public gRPC Protobuf specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute.proto
+.. _ITAC Compute Private gRPC Protobuf specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute_private.proto
+.. _ITAC Compute Public OpenAPI specification: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/public_api/proto/compute.swagger.json
 .. _gRPC-REST Gateway: https://github.com/grpc-ecosystem/grpc-gateway
-.. _IDC Console: https://console.idcservice.net/
+.. _ITAC Console: https://console.idcservice.net/
 .. _Shared Compute Services Design Document: https://intel.sharepoint.com/:w:/r/sites/inteldevelopercloud/Shared%20Documents/Phase%201/Compute-aaS/Shared%20Compute%20Services%20Design%20Document.docx?d=wb48aef2e5d894317acd720f9386f712c&csf=1&web=1&e=8Cdx2O
 .. _vnet_create_with_name.sh: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/go/svc/compute_api_server/test-scripts/vnet_create_with_name.sh
 .. _sshpublickey_create_with_name.sh: https://github.com/intel-innersource/frameworks.cloud.devcloud.services.idc/blob/main/go/svc/compute_api_server/test-scripts/sshpublickey_create_with_name.sh

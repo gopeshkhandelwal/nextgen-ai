@@ -399,7 +399,7 @@ def register_tools(mcp):
     @mcp.tool()
     async def document_qa(question: str, search_method: str = "hybrid", use_reranking: bool = False) -> str:
         """
-        Answer questions about IDC Compute gRPC APIs using advanced hybrid retrieval.
+        Answer questions about ITAC Compute gRPC APIs using advanced hybrid retrieval.
         
         This tool uses a combination of BM25 keyword search and semantic vector search
         to find relevant documents, with optional reranking for enhanced accuracy.
@@ -420,7 +420,7 @@ def register_tools(mcp):
         - Comprehensive source attribution
         
         Supported topics:
-        - IDC Compute gRPC APIs and their specifications
+        - ITAC Compute gRPC APIs and their specifications
         - Authentication methods including mTLS and Vault integration
         - Service operations (InstanceService, VNetService, etc.)
         - API testing with grpcurl

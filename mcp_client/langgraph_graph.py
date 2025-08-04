@@ -73,21 +73,21 @@ async def router(state: AgentState) -> AgentState:
 
         TOOL SELECTION GUIDELINES:
         - For weather questions: ONLY use city_weather tool
-        - For IDC gRPC API questions: ONLY use document_qa tool  
+        - For ITAC gRPC API questions: ONLY use document_qa tool  
         - For ITAC products: ONLY use list_itac_products
         - DO NOT call multiple tools for the same query unless explicitly needed
-        - DO NOT call document_qa for weather, general questions, or non-IDC topics
-        
+        - DO NOT call document_qa for weather, general questions, or non-ITAC topics
+
         IMPORTANT: When calling tools, preserve the user's EXACT question including all qualifiers 
         like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
         These words are important for determining the quality and depth of the response.
-        
+
         Do not simplify or paraphrase the user's question when calling tools.
-        
+
         CONVERSATION CONTEXT: You can only see the current conversation history provided to you.
-        If a user asks about something that happened earlier but is not visible in the current context,
-        simply say "I don't know" or "I don't have that information in our current conversation."
-        Do not make assumptions or ask for more information that you cannot access."""
+        If a user asks about something that happened earlier in this conversation and it is not visible, say "I don't know."
+        For general knowledge questions, answer directly and confidently, even if the question is not perfectly phrased. If the user's question is unclear, do your best to infer their intent and provide a helpful answer.
+        """
     )
     context_messages = [system_message] + state.get("messages", [])
     

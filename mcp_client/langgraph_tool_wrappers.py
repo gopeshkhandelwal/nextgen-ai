@@ -38,13 +38,13 @@ def build_tool_wrappers():
     @tool
     async def document_qa(question: str, search_method: str = "hybrid", use_reranking: bool = False) -> str:
         """
-        Answer questions SPECIFICALLY about IDC Compute gRPC APIs, documentation, endpoints, authentication methods, and technical details.
+        Answer questions SPECIFICALLY about ITAC Compute gRPC APIs, documentation, endpoints, authentication methods, and technical details.
 
         This tool uses advanced hybrid retrieval combining BM25 keyword search and semantic vector search
-        to find relevant documents from IDC gRPC API documentation, with optional reranking for enhanced accuracy.
+        to find relevant documents from ITAC gRPC API documentation, with optional reranking for enhanced accuracy.
 
         ONLY use this tool for questions about:
-        - IDC Compute gRPC APIs and their specifications
+        - ITAC Compute gRPC APIs and their specifications
         - API endpoints, authentication, and integration
         - gRPC service operations and protobuf definitions
         - Vault integration and mTLS authentication
@@ -52,11 +52,11 @@ def build_tool_wrappers():
         
         DO NOT use this tool for:
         - Weather information (use city_weather instead)
-        - General questions not related to IDC APIs
+        - General questions not related to ITAC APIs
         - ITAC products (use list_itac_products instead)
 
         Args:
-            question: The question about IDC APIs to answer
+            question: The question about ITAC APIs to answer
             search_method: Search method - "hybrid" (default), "semantic", or "keyword"  
             use_reranking: Whether to use reranking for better relevance (slower but more accurate)
         """
