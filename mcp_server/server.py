@@ -6,7 +6,7 @@ import logging
 import traceback
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from tools import weather, idc_images, idc_pools, rag, itac_products
+from tools import weather, rag, itac_products
 
 # Load environment variables
 load_dotenv()
@@ -27,8 +27,6 @@ def register_all_tools(mcp_instance):
         mcp_instance (FastMCP): An instance of the FastMCP server.
     """
     weather.register_tools(mcp_instance)
-    idc_pools.register_tools(mcp_instance)
-    idc_images.register_tools(mcp_instance)
     itac_products.register_tools(mcp_instance)
     rag.register_tools(mcp_instance)
 
