@@ -11,9 +11,6 @@ The ITAC AI Agent is a modular, production-ready framework that integrates Large
 
 ## Architecture
 
-### Component Diagram
-![Component Diagram](assets/component_diagram.png)
-
 ### Sequence Diagram
 ![Sequence Diagram](assets/sequence_diagram.png)
 
