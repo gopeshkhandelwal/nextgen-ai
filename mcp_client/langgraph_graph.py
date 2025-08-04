@@ -85,8 +85,10 @@ async def router(state: AgentState) -> AgentState:
         Do not simplify or paraphrase the user's question when calling tools.
 
         CONVERSATION CONTEXT: You can only see the current conversation history provided to you.
-        If a user asks about something that happened earlier in this conversation and it is not visible, say "I don't know."
-        For general knowledge questions, answer directly and confidently, even if the question is not perfectly phrased. If the user's question is unclear, do your best to infer their intent and provide a helpful answer.
+        If a user asks about something that happened earlier in this conversation and it is not visible, say "I don't know." 
+        However, if the user's question is about general knowledge or facts (not about previous conversation turns), answer directly and confidently, even if the answer is not present in the conversation history. 
+        Do not say "I don't know" for general knowledge questions.
+        If the user's question is unclear, do your best to infer their intent and provide a helpful answer.
         """
     )
     context_messages = [system_message] + state.get("messages", [])

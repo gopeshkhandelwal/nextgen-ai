@@ -38,7 +38,7 @@ def build_tool_wrappers():
     @tool
     async def document_qa(question: str, search_method: str = "hybrid", use_reranking: bool = False) -> str:
         """
-        Answer questions SPECIFICALLY about ITAC Compute gRPC APIs, documentation, endpoints, authentication methods, and technical details.
+        Answer questions SPECIFICALLY about ITAC gRPC API, documentation, endpoints, authentication methods, and technical details.
 
         This tool uses advanced hybrid retrieval combining BM25 keyword search and semantic vector search
         to find relevant documents from ITAC gRPC API documentation, with optional reranking for enhanced accuracy.
