@@ -147,7 +147,7 @@ build-vllm-hermes:
 	docker build \
 		--build-arg HF_TOKEN=$(HUGGINGFACE_HUB_TOKEN) \
 		-t vllm-fork-hermes-2-pro-llama-3-8b:1.0 \
-		-f $(CURDIR)/deployment/docker/vllm.Dockerfile $(CURDIR)
+		-f $(CURDIR)/deployment/docker/vllm.hermes-2-pro-llama-3-8B.Dockerfile $(CURDIR)
 	@echo "✅ vLLM-Hermes image built successfully!"
 
 run-vllm-hermes:
@@ -215,3 +215,93 @@ logs-vllm-hermes:
 	@echo "📜 Showing logs for vLLM-Hermes server..."
 	docker logs -f vllm-hermes-server
 	@echo "You can stop the logs with Ctrl+C"
+
+
+
+
+# === vLLM-openai-gpt-oss-20b Setup and Management ===
+build-vllm-openai-gpt-oss-20b:
+	@echo "🔥 Building vLLM-fork-openai-gpt-oss-20b Docker image..."
+	@if [ ! -f .env ]; then \
+		echo "❌ Error: .env file not found!"; \
+		echo "Please create .env with HUGGINGFACE_HUB_TOKEN"; \
+		exit 1; \
+	fi
+	$(eval include .env)
+	$(eval export $(shell sed 's/=.*//' .env))
+	@if [ -z "$(HUGGINGFACE_HUB_TOKEN)" ]; then \
+		echo "❌ Error: HUGGINGFACE_HUB_TOKEN not found in .env"; \
+		exit 1; \
+	fi
+	docker build \
+		--build-arg HF_TOKEN=$(HUGGINGFACE_HUB_TOKEN) \
+		-t vllm-fork-openai-gpt-oss-20b:1.0 \
+		-f $(CURDIR)/deployment/docker/vllm.openai-gpt-oss-20b.Dockerfile $(CURDIR)
+	@echo "✅ vLLM-openai-gpt-oss-20b image built successfully!"
+
+run-vllm-openai-gpt-oss-20b:
+	@echo "🚀 Starting vLLM-openai-gpt-oss-20b server with function calling..."
+	docker run -d \
+		--name vllm-openai-gpt-oss-20b-server \
+		-p 8001:8001 \
+		--runtime=habana \
+		-e HABANA_LOG_LEVEL=debug \
+		-e HABANA_VISIBLE_DEVICES=all \
+		--cap-add=sys_nice \
+		--net=host \
+		--ipc=host \
+		vllm-fork-openai-gpt-oss-20b:1.0 \
+		python3 -m vllm.entrypoints.openai.api_server \
+			--port 8001 \
+			--model /app/models/openai-gpt-oss-20b \
+			--served-model-name vllm-fork-openai-gpt-oss-20b \
+			--max-model-len 8192 \
+			--max-num-seqs 1 \
+			--disable-log-stats \
+			--tokenizer-pool-type none \
+			--gpu-memory-utilization 0.8 \
+			--enforce-eager \
+			--host 0.0.0.0 \
+			--enable-auto-tool-choice \
+			--tool-call-parser hermes \
+			--tensor-parallel-size 8
+	@echo "✅ vLLM-openai-gpt-oss-20b server started!"
+	@echo "Waiting for server to be ready..."
+	@sleep 10
+	@echo "Testing server health..."
+	@curl -s http://localhost:8001/health > /dev/null && echo "✅ Server is healthy" || echo "⚠️  Server may still be starting"
+
+# === Setup vLLM-openai-gpt-oss-20b server for local LLM inference ===
+# This will build the Docker image, run the server, and check its health
+setup-vllm-openai-gpt-oss-20b: build-vllm-openai-gpt-oss-20b run-vllm-openai-gpt-oss-20b
+	@echo "🎉 vLLM-openai-gpt-oss-20b setup complete!"
+	@echo "You can now run: make start-nextgen-suite"
+
+clean-vllm-openai-gpt-oss-20b-container:
+	@echo "🛑 Stopping vLLM-openai-gpt-oss-20b server..."
+	docker stop vllm-openai-gpt-oss-20b-server 2>/dev/null || echo "Container not running"
+	docker rm vllm-openai-gpt-oss-20b-server 2>/dev/null || echo "Container not found"
+	@echo "✅ vLLM-openai-gpt-oss-20b server stopped"
+
+clean-vllm-openai-gpt-oss-20b-image:
+	@echo "🗑️  Removing vllm-fork-openai-gpt-oss-20b:1.0 Docker image..."
+	docker rmi vllm-fork-openai-gpt-oss-20b:1.0 || echo "Image not found"
+	@echo "✅ vLLM-openai-gpt-oss-20b Docker image removed"
+
+check-vllm-openai-gpt-oss-20b:
+	@echo "🔍 Checking vLLM-openai-gpt-oss-20b server status..."
+	@if ! docker ps | grep -q vllm-openai-gpt-oss-20b-server; then \
+		echo "❌ vLLM-openai-gpt-oss-20b server is not running"; \
+		echo "Starting vLLM-openai-gpt-oss-20b server..."; \
+		$(MAKE) run-vllm-openai-gpt-oss-20b; \
+	else \
+		echo "✅ vLLM-openai-gpt-oss-20b server is running"; \
+	fi
+	@echo "Testing server connectivity..."
+	@curl -s http://localhost:8001/health > /dev/null && echo "✅ Server is responding" || (echo "❌ Server not responding, restarting..." && $(MAKE) stop-vllm-openai-gpt-oss-20b && $(MAKE) run-vllm-openai-gpt-oss-20b)
+
+logs-vllm-openai-gpt-oss-20b:
+	@echo "📜 Showing logs for vLLM-openai-gpt-oss-20b server..."
+	docker logs -f vllm-openai-gpt-oss-20b-server
+	@echo "You can stop the logs with Ctrl+C"
+

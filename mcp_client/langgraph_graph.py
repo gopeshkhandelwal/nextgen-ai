@@ -76,7 +76,7 @@ async def router(state: AgentState) -> AgentState:
         - For ITAC gRPC API questions: ONLY use document_qa tool  
         - For ITAC products: ONLY use list_itac_products
         - DO NOT call multiple tools for the same query unless explicitly needed
-        - DO NOT call document_qa for weather, general questions, or non-ITAC topics
+        - DO NOT call document_qa for weather, general questions, or non-ITAC questions
 
         IMPORTANT: When calling tools, preserve the user's EXACT question including all qualifiers 
         like "detailed", "comprehensive", "full explanation", "step-by-step", etc. 
